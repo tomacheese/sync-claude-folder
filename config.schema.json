@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "sync-claude-folder config",
+  "type": "object",
+  "required": ["stages"],
+  "additionalProperties": false,
+  "properties": {
+    "stages": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/stage" }
+    }
+  },
+  "definitions": {
+    "stage": {
+      "type": "object",
+      "required": [
+        "name",
+        "source",
+        "dest",
+        "chezmoiNaming",
+        "mirror",
+        "managed",
+        "ignore",
+        "protected",
+        "transforms"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "source": { "type": "string" },
+        "dest": { "type": "string" },
+        "chezmoiNaming": { "type": "boolean" },
+        "mirror": { "type": "boolean" },
+        "managed": { "type": "array", "items": { "type": "string" } },
+        "ignore": { "type": "array", "items": { "type": "string" } },
+        "protected": { "type": "array", "items": { "type": "string" } },
+        "transforms": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/transform" }
+        }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "required": ["path", "type", "ops"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "type": { "type": "string", "enum": ["json"] },
+        "ops": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/transformOp" }
+        }
+      }
+    },
+    "transformOp": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["op", "pointer"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "remove" },
+            "pointer": { "type": "string" }
+          }
+        },
+        {
+          "required": ["op", "pointer", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "set" },
+            "pointer": { "type": "string" },
+            "value": {}
+          }
+        },
+        {
+          "required": ["op", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "merge" },
+            "value": { "type": "object" }
+          }
+        }
+      ]
+    }
+  }
+}
