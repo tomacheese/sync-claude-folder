@@ -86,6 +86,13 @@ async function buildExpectedEntries(
       targetRel = resolved.targetPath
       type = resolved.type === 'symlink' ? 'symlink' : 'file'
       attrs = resolved.attrs
+    } else {
+      // chezmoiNaming: false の場合も lstat でシンボリックリンクを検出する
+      const absSrc = path.join(sourceDir, ...relPath.split('/'))
+      const srcStat = await fs.lstat(absSrc)
+      if (srcStat.isSymbolicLink()) {
+        type = 'symlink'
+      }
     }
 
     // 変換後の実名に対する managed 判定

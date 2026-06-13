@@ -7,6 +7,15 @@ import * as fs from 'node:fs/promises'
 import path from 'node:path'
 import { PlanItem, StagePlan } from './planner'
 
+/**
+ * 数値を 2 桁ゼロ埋めした文字列へ変換する。
+ * @param n 変換対象の数値
+ * @returns 2 桁ゼロ埋め文字列
+ */
+function pad(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
 /** apply 実行時のオプション */
 export interface ApplyOptions {
   /** true の場合のみ実際にファイルを書き込む。false の場合は何も変更しない (dry-run) */
@@ -27,10 +36,13 @@ export interface ApplyResult {
 
 /**
  * 現在時刻からバックアップディレクトリ名に使うタイムスタンプ文字列を生成する。
- * @returns `YYYY-MM-DDTHH-MM-SS-mmmZ` 形式の文字列 (ISO 8601 の `:` と `.` を `-` へ置換)
+ * @returns `YYYYMMDDTHHMMSS` 形式の文字列
  */
 export function buildTimestamp(): string {
-  return new Date().toISOString().replaceAll(/[:.]/g, '-')
+  const now = new Date()
+  const date = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const time = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
+  return `${date}T${time}`
 }
 
 /**

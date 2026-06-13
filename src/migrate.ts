@@ -96,7 +96,14 @@ export async function planMigration(
 ): Promise<MigratePlan> {
   const alreadyMigrated = !(await isJunctionToSource(claudeDir, sourceDir))
 
-  const trackedTopLevel = getTrackedTopLevelEntries(sourceDir)
+  let trackedTopLevel: Set<string>
+  try {
+    trackedTopLevel = getTrackedTopLevelEntries(sourceDir)
+  } catch (error) {
+    throw new Error(
+      `Failed to run "git ls-files" in ${sourceDir}: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
   const allEntries = await fs.readdir(sourceDir)
 
   const runtimeEntries: string[] = []

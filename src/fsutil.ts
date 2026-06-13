@@ -71,14 +71,22 @@ export async function walkFiles(root: string): Promise<string[]> {
   return result
 }
 
+/** glob パターン文字列 → 正規表現のキャッシュ */
+const globRegExpCache = new Map<string, RegExp>()
+
 /**
  * glob パターン (`*` / `**` / `?` に対応) を正規表現へ変換する。
+ * 変換結果はモジュールレベルでキャッシュされ、同一パターンの再コンパイルを避ける。
  * `**` はパス区切りを含めて任意長にマッチし、`**\/` は 0 階層も許容する。
  * `*` はパス区切りを含まない任意長、`?` は任意の 1 文字 (パス区切り以外) にマッチする。
  * @param pattern glob パターン
  * @returns 変換後の正規表現 (完全一致)
  */
 export function globToRegExp(pattern: string): RegExp {
+  const cached = globRegExpCache.get(pattern)
+  if (cached) {
+    return cached
+  }
   let regExpSource = ''
   for (let i = 0; i < pattern.length; i++) {
     const char = pattern[i]
@@ -105,7 +113,9 @@ export function globToRegExp(pattern: string): RegExp {
       regExpSource += char
     }
   }
-  return new RegExp(`^${regExpSource}$`)
+  const regexp = new RegExp(`^${regExpSource}$`)
+  globRegExpCache.set(pattern, regexp)
+  return regexp
 }
 
 /**
