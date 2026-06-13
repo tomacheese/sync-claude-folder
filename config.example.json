@@ -1,0 +1,180 @@
+{
+  "stages": [
+    {
+      "name": "dotfiles-to-claude",
+      "source": "~/repos/dotfiles/home/dot_claude",
+      "dest": "~/.claude",
+      "chezmoiNaming": true,
+      "mirror": true,
+      "managed": [
+        "hooks/**",
+        "scripts/**",
+        "rules/**",
+        "skills/**",
+        "patches/**",
+        "commands/**",
+        "CLAUDE.md",
+        "RTK.md",
+        "settings.json"
+      ],
+      "ignore": [
+        ".chezmoi*",
+        ".chezmoiscripts/**",
+        "**/*.tmpl",
+        ".gitignore",
+        "README.md"
+      ],
+      "protected": [
+        ".credentials.json",
+        ".claude.json",
+        ".claude.json.backup",
+        "history.jsonl",
+        ".last-*",
+        "mcp-needs-auth-cache.json",
+        "remote-settings.json",
+        "policy-limits.json",
+        "backups/**",
+        "cache/**",
+        "debug/**",
+        "downloads/**",
+        "file-history/**",
+        "paste-cache/**",
+        "projects/**",
+        "session-env/**",
+        "sessions/**",
+        "shell-snapshots/**",
+        "statsig/**",
+        "tasks/**",
+        "todos/**",
+        "telemetry/**",
+        "locks/**",
+        "logs/**",
+        "plans/**",
+        "teams/**",
+        "plugins/cache/**",
+        "plugins/data/**",
+        "plugins/repos/**",
+        "plugins/marketplaces/**",
+        "plugins/config.json",
+        "plugins/installed_plugins.json",
+        "plugins/known_marketplaces.json",
+        "plugins/*blocklist.json"
+      ],
+      "transforms": [
+        {
+          "path": "settings.json",
+          "type": "json",
+          "ops": [
+            { "op": "remove", "pointer": "/hooks" },
+            {
+              "op": "merge",
+              "value": {
+                "remoteControlAtStartup": true,
+                "agentPushNotifEnabled": true,
+                "tui": "fullscreen",
+                "env": {
+                  "GH_CONFIG_DIR": "/path/to/gh-config-dir",
+                  "GIT_AUTHOR_NAME": "Your Name",
+                  "GIT_AUTHOR_EMAIL": "you@example.com",
+                  "GIT_COMMITTER_NAME": "Your Name",
+                  "GIT_COMMITTER_EMAIL": "you@example.com",
+                  "GIT_SSH_COMMAND": "ssh -F /path/to/ssh-config"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "claude-to-claude-work",
+      "source": "~/.claude",
+      "dest": "~/.claude-work",
+      "chezmoiNaming": false,
+      "mirror": true,
+      "managed": [
+        "skills/**",
+        "rules/**",
+        "hooks/**",
+        "scripts/**",
+        "commands/**",
+        "patches/**",
+        "CLAUDE.md",
+        "RTK.md",
+        "settings.json"
+      ],
+      "ignore": [],
+      "protected": [
+        ".credentials.json",
+        ".claude.json",
+        ".claude.json.backup",
+        "projects",
+        "projects/**",
+        "sessions/**",
+        "session-env/**",
+        "history.jsonl",
+        ".last-*",
+        "mcp-needs-auth-cache.json",
+        "remote-settings.json",
+        "policy-limits.json",
+        "backups/**",
+        "cache/**",
+        "debug/**",
+        "downloads/**",
+        "file-history/**",
+        "paste-cache/**",
+        "shell-snapshots/**",
+        "statsig/**",
+        "tasks/**",
+        "todos/**",
+        "telemetry/**",
+        "locks/**",
+        "logs/**",
+        "plans/**",
+        "teams/**",
+        "plugins/cache/**",
+        "plugins/data/**",
+        "plugins/repos/**",
+        "plugins/marketplaces/**",
+        "plugins/config.json",
+        "plugins/installed_plugins.json",
+        "plugins/known_marketplaces.json",
+        "plugins/*blocklist.json"
+      ],
+      "transforms": [
+        {
+          "path": "settings.json",
+          "type": "json",
+          "ops": [
+            { "op": "remove", "pointer": "/hooks" },
+            { "op": "set", "pointer": "/theme", "value": "dark-daltonized" },
+            {
+              "op": "merge",
+              "value": {
+                "remoteControlAtStartup": true,
+                "agentPushNotifEnabled": true,
+                "tui": "fullscreen",
+                "extraKnownMarketplaces": {
+                  "wakatime": {
+                    "source": {
+                      "source": "github",
+                      "repo": "wakatime/claude-code-wakatime"
+                    }
+                  }
+                },
+                "env": {
+                  "GH_CONFIG_DIR": "/path/to/gh-config-dir",
+                  "GIT_AUTHOR_NAME": "Your Name",
+                  "GIT_AUTHOR_EMAIL": "you@example.com",
+                  "GIT_COMMITTER_NAME": "Your Name",
+                  "GIT_COMMITTER_EMAIL": "you@example.com",
+                  "GIT_SSH_COMMAND": "ssh -F /path/to/ssh-config"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
