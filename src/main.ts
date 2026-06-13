@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 
   const command = positionals[0]
   const configPath = values.config
-    ? path.resolve(values.config)
+    ? path.resolve(expandHome(values.config))
     : DEFAULT_CONFIG_PATH
   const backupRoot = values['backup-root']
     ? path.resolve(expandHome(values['backup-root']))

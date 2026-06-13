@@ -116,10 +116,16 @@ async function buildExpectedEntries(
     let content = await fs.readFile(absSource)
     const transform = stage.transforms.find((t) => t.path === targetRel)
     if (transform) {
-      content = Buffer.from(
-        applyJsonTransform(content.toString('utf8'), transform.ops),
-        'utf8'
-      )
+      try {
+        content = Buffer.from(
+          applyJsonTransform(content.toString('utf8'), transform.ops),
+          'utf8'
+        )
+      } catch (error) {
+        throw new Error(
+          `Failed to apply transform to "${targetRel}": ${error instanceof Error ? error.message : String(error)}`
+        )
+      }
     }
     expected.set(targetRel, { type, content, attrs, sourcePath: absSource })
   }
