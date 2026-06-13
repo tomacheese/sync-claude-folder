@@ -50,6 +50,10 @@ export interface ResolvedChezmoiPath {
   ignore: boolean
 }
 
+/**
+ * 全属性が false のデフォルト `ChezmoiAttributes` を返す。
+ * @returns デフォルト属性オブジェクト
+ */
 function defaultAttrs(): ChezmoiAttributes {
   return { private: false, readonly: false, executable: false, exact: false }
 }

@@ -27,7 +27,7 @@ export interface ApplyResult {
 
 /**
  * 現在時刻からバックアップディレクトリ名に使うタイムスタンプ文字列を生成する。
- * @returns `YYYYMMDDTHHMMSS` 形式の文字列
+ * @returns `YYYY-MM-DDTHH-MM-SS-mmmZ` 形式の文字列 (ISO 8601 の `:` と `.` を `-` へ置換)
  */
 export function buildTimestamp(): string {
   return new Date().toISOString().replaceAll(/[:.]/g, '-')

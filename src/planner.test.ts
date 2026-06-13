@@ -147,6 +147,18 @@ describe('planStage', () => {
     ).toBeUndefined()
   })
 
+  test('mirror: false のとき dest にのみ存在するファイルは削除されない', async () => {
+    await writeFile(path.join(destDir, 'hooks', 'old.sh'), 'echo old\n')
+
+    const plan = await planStage(buildStage({ mirror: false }))
+    const item = plan.items.find((i) => i.relPath === 'hooks/old.sh')
+
+    expect(
+      item,
+      'mirror: false のとき managed 範囲内でも余剰ファイルは削除されないこと'
+    ).toBeUndefined()
+  })
+
   test('ignore に一致するソースファイルは対象外になる', async () => {
     await writeFile(
       path.join(sourceDir, 'hooks', 'executable_foo.sh'),

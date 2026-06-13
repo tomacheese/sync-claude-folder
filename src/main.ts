@@ -114,7 +114,7 @@ async function runMigrate(
 ): Promise<void> {
   const config = loadConfig(configPath)
   if (config.stages.length === 0) {
-    throw new Error('config.json に stages が定義されていません')
+    throw new Error('No stages defined in config.json')
   }
   const [firstStage] = config.stages
 

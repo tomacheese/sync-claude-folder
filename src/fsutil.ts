@@ -41,6 +41,10 @@ export function toPosixPath(targetPath: string): string {
 export async function walkFiles(root: string): Promise<string[]> {
   const result: string[] = []
 
+  /**
+   * 指定ディレクトリを再帰的に走査して `result` へ追加する内部ヘルパー。
+   * @param dir 走査対象ディレクトリの絶対パス
+   */
   async function walk(dir: string): Promise<void> {
     let entries: import('node:fs').Dirent[]
     try {
