@@ -50,3 +50,6 @@ dist
 
 # pnpm
 .pnpm-store
+
+# Personal sync config (copy from config.example.json)
+config.json

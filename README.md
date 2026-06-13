@@ -1,74 +1,65 @@
 # sync-claude-folder
 
-chezmoi ライクな命名変換ルールに従い、dotfiles リポジトリの `dot_claude` ソースを
-`~/.claude`・`~/.claude-work` へ同期する CLI ツール。
+A CLI tool that syncs the `dot_claude` source in a dotfiles repository to `~/.claude`
+and `~/.claude-work`, following chezmoi-like naming conversion rules.
 
-## 背景
+## Background
 
-- `~/repos/dotfiles/home/dot_claude` (chezmoi ソース) を `~/.claude` へ実体化する。
-- 同じ内容を、別アカウントで利用する `~/.claude-work` にも (認証/ランタイムを保護しつつ) 同期する。
-- chezmoi 本体は使用せず、本ツールが chezmoi 命名変換 (`dot_`/`private_`/`executable_`/`readonly_` 等の
-  サブセット) と JSON transform (`remove`/`set`/`merge`) を行う。
+- Materializes `~/repos/dotfiles/home/dot_claude` (chezmoi source) into `~/.claude`.
+- Also syncs the same content to `~/.claude-work` (used with a separate account),
+  while protecting auth/runtime data.
+- Does not use chezmoi itself — this tool performs chezmoi naming conversion
+  (`dot_`/`private_`/`executable_`/`readonly_` subset) and JSON transforms
+  (`remove`/`set`/`merge`).
 
-## セットアップ
+## Setup
 
 ```bash
+cp config.example.json config.json
+# Edit config.json to match your environment
 pnpm install
 ```
 
-## 使い方
+## Usage
 
 ### sync
 
-`config.json` に定義された各ステージについて、同期プラン (create/update/delete/skip) を算出する。
-既定では dry-run (計画表示のみ) で、`--apply` を指定した場合のみファイルへ反映する。
+Calculates a sync plan (create/update/delete/skip) for each stage defined in `config.json`.
+Defaults to dry-run (plan display only); files are written only when `--apply` is specified.
 
 ```bash
-# 全ステージの計画を表示する (dry-run)
+# Show plan for all stages (dry-run)
 pnpm sync
 
-# 特定ステージのみ
+# Specific stage only
 pnpm sync -- --stage dotfiles-to-claude
 
-# 実際に反映する
+# Apply changes
 pnpm sync -- --apply
 
-# 別の config を使う
+# Use a different config
 pnpm sync -- --config ./config.json --apply
 ```
 
-書き込み・削除の前には、`~/.sync-claude-backup/<timestamp>/<relPath>` (既定値。
-`--backup-root` で変更可) に既存ファイルがバックアップされる。
-
-### migrate-claude
-
-`~/.claude` が dotfiles ソースディレクトリへのジャンクション/シンボリックリンクになっている状態から、
-実ディレクトリへ一回限りで完全移行する。`git ls-files` で求めたソース追跡ファイル集合を基に、
-追跡対象外 (ランタイム/認証データ) のトップレベルエントリのみを新しい `~/.claude` へ移動する。
-
-```bash
-# 移行計画を確認する (dry-run, 必須)
-pnpm migrate
-
-# 実行する (バックアップ後に移動・実ディレクトリ化を行う)
-pnpm migrate -- --apply
-```
-
-実行後、`sync --stage dotfiles-to-claude --apply` を実行してソースファイルを実体化すること。
+Before writing or deleting, existing files are backed up to
+`~/.sync-claude-backup/<timestamp>/<relPath>` (default; override with `--backup-root`).
 
 ## config.json
 
-- `stages[].source` / `dest`: 同期元/同期先 (`~` 展開対応)
-- `chezmoiNaming`: ソース名を chezmoi 命名規則で実名へ変換するか
-- `mirror`: `managed` 範囲内でソースに存在しない実名ファイルを削除するか
-- `managed`: 同期・ミラー対象とする実名 glob
-- `ignore`: ソース側で無視する glob (変換前のソース名に対して判定)
-- `protected`: dest 側で create/update/delete のいずれからも常に除外する glob
-- `transforms`: JSON ファイルに対する `remove`/`set`/`merge` 操作
+Copy `config.example.json` to `config.json` and edit to match your environment.
+`config.json` is gitignored because it contains machine-specific paths and credentials.
 
-詳細は [`config.schema.json`](./config.schema.json) を参照。
+- `stages[].source` / `dest`: source/destination directories (`~` expansion supported)
+- `chezmoiNaming`: whether to convert source names from chezmoi naming to real names
+- `mirror`: whether to delete real-name files inside `managed` that no longer exist in source
+- `managed`: real-name globs to sync and mirror
+- `ignore`: globs to ignore on the source side (evaluated against pre-conversion source names)
+- `protected`: globs always excluded from create/update/delete on the dest side
+- `transforms`: `remove`/`set`/`merge` operations applied to JSON files
 
-## 開発
+See [`config.schema.json`](./config.schema.json) for the full schema.
+
+## Development
 
 ```bash
 pnpm lint   # prettier + eslint + tsc

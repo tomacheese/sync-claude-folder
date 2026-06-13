@@ -1,161 +1,156 @@
-# Claude Code 作業方針
+# Claude Code Guidelines
 
-## 目的
+## Purpose
 
-このドキュメントは、Claude Code がこのプロジェクトで作業する際の方針とプロジェクト固有ルールを定義します。
+This document defines the working policy and project-specific rules for Claude Code in this project.
 
-## 判断記録のルール
+## Decision Logging Rules
 
-判断は必ずレビュー可能な形で記録すること:
+All decisions must be recorded in a reviewable form:
 
-1. **判断内容の要約**: 何を決定したかを明確に記載
-2. **検討した代替案**: 考慮した他の選択肢を列挙
-3. **採用しなかった案とその理由**: なぜその案を選ばなかったかを明示
-4. **前提条件・仮定・不確実性**: 判断の前提となる条件や仮定を明示
-5. **他エージェントによるレビュー可否**: 他のエージェントがレビューできるかを示す
+1. **Summary of decision**: Clearly describe what was decided
+2. **Alternatives considered**: List other options that were evaluated
+3. **Rejected options and reasons**: Explain why each alternative was not chosen
+4. **Preconditions, assumptions, and uncertainties**: State the assumptions the decision rests on
+5. **Reviewability by other agents**: Indicate whether another agent can review the decision
 
-**重要**: 前提・仮定・不確実性を明示すること。仮定を事実のように扱ってはならない。
+**Important**: Always make preconditions, assumptions, and uncertainties explicit. Do not treat assumptions as facts.
 
-## プロジェクト概要
+## Project Overview
 
-- **目的**: chezmoi ライクな命名変換・transform ルールに従い、dotfiles リポジトリの
-  `home/dot_claude` を `~/.claude` / `~/.claude-work` へ同期する CLI ツール
-- **主な機能**:
-  - chezmoi 命名変換のサブセット (`dot_`/`private_`/`executable_`/`readonly_`/`exact_`/`literal_`/`symlink_` 等)
-  - JSON Pointer ベースの transform (`remove`/`set`/`merge`)
-  - `config.json` 駆動の create/update/delete/skip プラン算出と適用 (dry-run 既定)
-  - `~/.claude` のジャンクション/シンボリックリンクから実ディレクトリへの一回限りの移行 (`migrate-claude`)
+- **Purpose**: A CLI tool that syncs `home/dot_claude` from a dotfiles repository to
+  `~/.claude` / `~/.claude-work` following chezmoi-like naming conversion and transform rules
+- **Key features**:
+  - chezmoi naming conversion subset (`dot_`/`private_`/`executable_`/`readonly_`/`exact_`/`literal_`/`symlink_` etc.)
+  - JSON Pointer-based transforms (`remove`/`set`/`merge`)
+  - `config.json`-driven create/update/delete/skip plan calculation and application (dry-run by default)
 
-## 重要ルール
+## Core Rules
 
-- **会話言語**: 日本語
-- **コード内コメント**: 日本語
-- **エラーメッセージ**: 英語
-- **日本語と英数字の間**: 半角スペースを挿入
-- **コミットメッセージ**: [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) に従う
-  - 形式: `<type>(<scope>): <description>`
-  - `<description>` は日本語で記載
-  - 例: `feat: chezmoi 命名変換モジュールを追加`
+- **Conversation language**: Japanese
+- **Code comments**: Japanese
+- **Error messages**: English
+- **Japanese/alphanumeric spacing**: Insert a half-width space between Japanese and alphanumeric characters
+- **Commit messages**: Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+  - Format: `<type>(<scope>): <description>`
+  - `<description>` must be in Japanese
+  - Example: `feat: chezmoi 命名変換モジュールを追加`
 
-## 環境のルール
+## Environment Rules
 
-- **ブランチ命名**: [Conventional Branch](https://conventional-branch.github.io) に従う
-  - 形式: `<type>/<description>`
-  - `<type>` は短縮形 (feat, fix など) を使用
-- **GitHub リポジトリ調査**: テンポラリディレクトリに git clone して、そこでコード検索すること
-- **Renovate PR**: Renovate が作成した既存の PR に対して、追加コミットや更新を行ってはならない
+- **Branch naming**: Follow [Conventional Branch](https://conventional-branch.github.io)
+  - Format: `<type>/<description>`
+  - Use short-form `<type>` (feat, fix, etc.)
+- **Researching GitHub repositories**: Clone to a temporary directory and search there
+- **Renovate PRs**: Do not add commits or updates to existing Renovate-created PRs
 
-## Git Worktree について
+## Git Worktree
 
-このプロジェクトでは Git Worktree は使用していません。通常の Git ブランチ運用を行ってください。
+This project does not use Git Worktree. Use standard Git branch operations.
 
-## コード改修時のルール
+## Code Modification Rules
 
-- **TypeScript の skipLibCheck**: 有効にして型エラーを回避することは絶対にしてはならない
-- **docstring**: 関数・インターフェース・クラスには JSDoc を日本語で記載・更新すること
-- **エラーメッセージの絵文字**: 既存のエラーメッセージで先頭に絵文字がある場合は、全体で統一すること
+- **TypeScript skipLibCheck**: Never enable this to work around type errors
+- **Docstrings**: Write and maintain JSDoc in Japanese for all functions, interfaces, and classes
+- **Error message emoji**: If existing error messages in a file use emoji prefixes, unify usage across the file
 
-## 開発コマンド
+## Development Commands
 
 ```bash
-# 依存関係のインストール (必須: pnpm を使用)
+# Install dependencies (pnpm required)
 pnpm install
 
-# 同期プランの確認 (dry-run)
+# Show sync plan (dry-run)
 pnpm sync
 
-# 同期の実行
+# Apply sync
 pnpm sync -- --apply
 
-# ~/.claude の実体化移行 (dry-run)
-pnpm migrate
-
-# Lint チェック (全体: prettier, eslint, tsc)
+# Lint check (prettier + eslint + tsc)
 pnpm lint
 
-# 自動修正
+# Auto-fix
 pnpm fix
 
-# テスト実行 (カバレッジ報告付き)
+# Run tests (with coverage)
 pnpm test
 ```
 
-## アーキテクチャと主要ファイル
+## Architecture and Key Files
 
-| ファイル | 目的 |
+| File | Purpose |
 |---|---|
-| `src/main.ts` | CLI エントリポイント (`sync` / `migrate-claude` の dispatch) |
-| `src/config.ts` | `config.json` の型定義・読み込み・検証 |
-| `src/chezmoi-name.ts` | chezmoi 命名変換 (ソース名 → 実名・種別・属性) |
-| `src/fsutil.ts` | パス展開・glob 判定・再帰走査などのユーティリティ |
-| `src/planner.ts` | ステージごとの create/update/delete/skip プラン算出 |
-| `src/transforms.ts` | JSON Pointer ベースの transform (`remove`/`set`/`merge`) |
-| `src/apply.ts` | プランの適用 (バックアップ取得・書き込み・削除・chmod) |
-| `src/migrate.ts` | `~/.claude` の実体化移行 (一回限り) |
-| `config.json` | 同期ステージ定義 (source/dest/managed/ignore/protected/transforms) |
-| `config.schema.json` | `config.json` の JSON Schema |
+| `src/main.ts` | CLI entry point (`sync` command dispatch) |
+| `src/config.ts` | Type definitions, loading, and validation for `config.json` |
+| `src/chezmoi-name.ts` | chezmoi naming conversion (source name → real name, type, attributes) |
+| `src/fsutil.ts` | Path expansion, glob matching, recursive traversal utilities |
+| `src/planner.ts` | Per-stage create/update/delete/skip plan calculation |
+| `src/transforms.ts` | JSON Pointer-based transforms (`remove`/`set`/`merge`) |
+| `src/apply.ts` | Plan application (backup, write, delete, chmod) |
+| `config.json` | Sync stage definitions (source/dest/managed/ignore/protected/transforms) |
+| `config.example.json` | Template for `config.json` with placeholder values |
+| `config.schema.json` | JSON Schema for `config.json` |
 
-### 実装パターン
+### Implementation Patterns
 
-推奨:
-- 各モジュールは単一責務を保つ (命名変換 / transform / プラン算出 / 適用 / 移行 を分離)
-- 破壊的操作 (`apply.ts`, `migrate.ts`) は必ず dry-run を既定とし、`--apply` 指定時のみ実行する
-- 上書き・削除前には常にバックアップを取得する
+Recommended:
+- Keep each module single-responsibility (naming conversion / transform / plan calculation / application)
+- Destructive operations (`apply.ts`) must default to dry-run; only execute with `--apply`
+- Always back up files before overwriting or deleting
 
-非推奨:
-- `skipLibCheck` の使用
-- dry-run を経ずに `migrate-claude --apply` を実行するフロー変更
+Not recommended:
+- Using `skipLibCheck`
 
-## テスト
+## Testing
 
-- テストフレームワーク: Jest + ts-jest
-- テストファイル配置: 各ソースファイルに隣接する `*.test.ts` (`testMatch: ["**/*.test.ts"]`)
-- テストコマンド: `pnpm test`
-- `src/chezmoi-name.ts` / `src/transforms.ts` / `src/planner.ts` は一時ディレクトリ (`os.tmpdir()`) を用いて検証する
+- Test framework: Jest + ts-jest
+- Test file placement: Adjacent `*.test.ts` files (`testMatch: ["**/*.test.ts"]`)
+- Test command: `pnpm test`
+- `src/chezmoi-name.ts` / `src/transforms.ts` / `src/planner.ts` are tested using a temp directory (`os.tmpdir()`)
 
-### 追加テスト条件
+### Additional Test Requirements
 
-- 新しい chezmoi 属性・transform 操作・プラン分岐を追加する場合は必ず対応するテストを追加する
-- `protected` / `mirror` の境界条件 (削除されない・上書きされない) は必ずテストでカバーする
+- Always add corresponding tests when adding new chezmoi attributes, transform operations, or plan branches
+- `protected` / `mirror` boundary conditions (not deleted, not overwritten) must always be covered by tests
 
-## ドキュメント更新ルール
+## Documentation Update Rules
 
-### 更新対象
+### Files to Update Together
 
-以下のドキュメントを更新する場合は、同時に更新すること:
+When updating the following files, update them simultaneously:
 
-- `README.md`: 使い方・config.json の説明変更時
-- `CLAUDE.md` (このファイル) / `AGENTS.md` / `GEMINI.md`: 開発方針・コマンド変更時
-- `config.schema.json`: `config.json` の構造変更時
+- `README.md`: when usage or config.json documentation changes
+- `CLAUDE.md` (this file): when development policy or commands change
+- `config.schema.json`: when the structure of `config.json` changes
 
-## 作業チェックリスト
+## Work Checklist
 
-### 新規改修時
+### Before New Work
 
-1. プロジェクトについて詳細に探索し理解すること
-2. 作業を行うブランチが適切であること。すでに PR を提出しクローズされたブランチでないこと
-3. 最新のリモートブランチに基づいた新規ブランチであること
-4. PR がクローズされ、不要となったブランチは削除されていること
-5. `pnpm install` で依存パッケージをインストールしたこと
+1. Thoroughly explore and understand the project
+2. Verify the working branch is appropriate — not a branch with a closed PR
+3. Verify it is a new branch based on the latest remote branch
+4. Verify that closed/unnecessary branches have been deleted
+5. Install dependencies with `pnpm install`
 
-### コミット・プッシュする前
+### Before Commit/Push
 
-1. コミットメッセージが Conventional Commits に従っていること (`<description>` は日本語)
-2. コミット内容にセンシティブな情報が含まれていないこと
-3. `pnpm lint` でエラーが発生しないこと
-4. `pnpm test` が成功すること
+1. Commit message follows Conventional Commits (`<description>` in Japanese)
+2. No sensitive information in the commit
+3. `pnpm lint` passes with no errors
+4. `pnpm test` passes
 
-### プルリクエストを作成する前
+### Before Creating a PR
 
-1. プルリクエストの作成をユーザーから依頼されていること
-2. コミット内容にセンシティブな情報が含まれていないこと
-3. コンフリクトする恐れが無いこと
+1. PR creation has been explicitly requested by the user
+2. No sensitive information in the commit
+3. No risk of merge conflicts
 
-## リポジトリ固有
+## Repository-Specific Notes
 
-- `~/.claude` および `~/.claude-work` は認証情報・セッション履歴を含む実運用ディレクトリである。
-  `config.json` の `protected` リストは常に最優先で適用され、`migrate-claude` / `sync --apply` から
-  保護される。protected リストを変更する場合は、変更内容を必ずユーザーに説明し承認を得ること。
-- `hooks/symlink_literal_executable_*.sh` は dotfiles 側の方針 (`symlink_executable_` 回避策禁止) に
-  反する残骸であり、本ツールでは `ignore` 設定により常に無視する。dotfiles 側からの削除は本ツールの
-  スコープ外。
+- `~/.claude` and `~/.claude-work` are live directories containing auth credentials and session history.
+  The `protected` list in `config.json` is always applied with highest priority, protecting them from
+  `sync --apply`. Any changes to the protected list must be explained to and approved by the user.
+- `hooks/symlink_literal_executable_*.sh` is dead code in the dotfiles that violates the policy
+  (no `symlink_executable_` workarounds). This tool ignores it via the `ignore` config.
+  Removing it from dotfiles is out of scope for this tool.

@@ -1,7 +1,7 @@
 {
   "name": "sync-claude-folder",
   "version": "1.0.0",
-  "description": "chezmoi ライクなルールで dotfiles の dot_claude を ~/.claude / ~/.claude-work へ同期する CLI",
+  "description": "CLI tool that syncs dot_claude from a dotfiles repo to ~/.claude / ~/.claude-work using chezmoi-like naming rules",
   "homepage": "https://github.com/tomacheese/sync-claude-folder",
   "bugs": {
     "url": "https://github.com/tomacheese/sync-claude-folder/issues"
@@ -18,7 +18,6 @@
     "start": "tsx ./src/main.ts",
     "dev": "tsx watch ./src/main.ts",
     "sync": "tsx ./src/main.ts sync",
-    "migrate": "tsx ./src/main.ts migrate-claude",
     "lint": "run-z lint:prettier,lint:eslint,lint:tsc",
     "fix": "run-z fix:prettier,fix:eslint",
     "lint:prettier": "prettier --check src",

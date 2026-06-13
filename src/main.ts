@@ -1,12 +1,9 @@
 /**
  * sync-claude-folder の CLI エントリポイント。
  *
- * - `sync [--stage <name>] [--apply] [--config <path>]`
+ * - `sync [--stage <name>] [--apply] [--config <path>] [--backup-root <path>]`
  *   config.json の各ステージに従い、ソース → dest の同期プランを算出・表示する。
  *   `--apply` を指定した場合のみ実際にファイルを書き込む (既定は dry-run)。
- * - `migrate-claude [--apply] [--backup-root <path>] [--config <path>]`
- *   `~/.claude` がソースリポジトリへのジャンクションである状態から実ディレクトリへ
- *   一回限りで完全移行する。`--apply` を指定した場合のみ実行する (既定は dry-run)。
  */
 
 import * as os from 'node:os'
@@ -15,7 +12,6 @@ import { parseArgs } from 'node:util'
 import { applyStagePlan } from './apply'
 import { loadConfig, selectStages, StageConfig } from './config'
 import { expandHome } from './fsutil'
-import { applyMigration, planMigration } from './migrate'
 import { PlanItem, planStage, StagePlan } from './planner'
 
 // eslint-disable-next-line unicorn/prefer-module -- CommonJS 構成のため __dirname を使用する
@@ -101,74 +97,11 @@ async function runSync(
   }
 }
 
-/**
- * `migrate-claude` サブコマンドを実行する。
- * @param configPath config.json への絶対パス (stage1 の source/dest を利用する)
- * @param apply true の場合のみ実際に移行を実行する
- * @param backupRoot バックアップ先ルートディレクトリ
- */
-async function runMigrate(
-  configPath: string,
-  apply: boolean,
-  backupRoot: string
-): Promise<void> {
-  const config = loadConfig(configPath)
-  if (config.stages.length === 0) {
-    throw new Error('No stages defined in config.json')
-  }
-  const [firstStage] = config.stages
-
-  const claudeDir = expandHome(firstStage.dest)
-  const sourceDir = expandHome(firstStage.source)
-
-  const plan = await planMigration(claudeDir, sourceDir, backupRoot)
-
-  console.log(
-    apply
-      ? 'Mode: apply (移行を実行します)'
-      : 'Mode: dry-run (計画のみ表示します)'
-  )
-  console.log('')
-  console.log(`claude dir: ${plan.claudeDir}`)
-  console.log(`source dir: ${plan.sourceDir}`)
-  console.log(`backup dir: ${plan.backupDir}`)
-  console.log('')
-
-  if (plan.alreadyMigrated) {
-    console.log(
-      `${plan.claudeDir} はソースディレクトリへのジャンクション/シンボリックリンクではありません。移行は不要、または既に完了しています。`
-    )
-    return
-  }
-
-  console.log('source dir に残すエントリ (chezmoi ソース):')
-  for (const entry of plan.sourceEntries.toSorted()) {
-    console.log(`  = ${entry}`)
-  }
-  console.log('')
-  console.log('claude dir へ移動するエントリ (ランタイム/認証):')
-  for (const entry of plan.runtimeEntries.toSorted()) {
-    console.log(`  > ${entry}`)
-  }
-  console.log('')
-
-  await applyMigration(plan, { apply })
-
-  if (apply) {
-    console.log(
-      '移行が完了しました。続けて `sync --stage dotfiles-to-claude --apply` を実行してください。'
-    )
-  }
-}
-
 /** CLI の使い方を表示する */
 function printUsage(): void {
   console.log('Usage:')
   console.log(
     '  sync-claude-folder sync [--stage <name>] [--apply] [--config <path>] [--backup-root <path>]'
-  )
-  console.log(
-    '  sync-claude-folder migrate-claude [--apply] [--config <path>] [--backup-root <path>]'
   )
 }
 
@@ -197,10 +130,6 @@ async function main(): Promise<void> {
   switch (command) {
     case 'sync': {
       await runSync(configPath, values.stage, apply, backupRoot)
-      return
-    }
-    case 'migrate-claude': {
-      await runMigrate(configPath, apply, backupRoot)
       return
     }
     default: {
