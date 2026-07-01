@@ -105,10 +105,28 @@ function printUsage(): void {
   )
 }
 
+/**
+ * `parseArgs` に渡す前に、孤立した `--` トークンを取り除く。
+ *
+ * `pnpm run sync -- --apply` のように pnpm 経由で実行すると、pnpm の
+ * 「`--` 以降を子スクリプトへそのまま転送する」仕様により `--` 自体も
+ * `process.argv` に literal な要素として残る。`util.parseArgs` は
+ * 裸の `--` を「オプション解析の終端」として扱い、以降の全ての引数を
+ * positionals に落としてしまうため、そのまま渡すと `--apply` がオプ
+ * ションとして認識されず常に dry-run になってしまう。
+ * このツールの CLI は positionals としてサブコマンド名 (`sync`) しか
+ * 使わないため、`--` を無条件に取り除いても既存の解析結果に影響しない。
+ * @param args 生の CLI 引数配列
+ * @returns `--` を除いた引数配列
+ */
+export function stripDoubleDashSeparator(args: string[]): string[] {
+  return args.filter((arg) => arg !== '--')
+}
+
 /** CLI のエントリポイント */
 async function main(): Promise<void> {
   const { positionals, values } = parseArgs({
-    args: process.argv.slice(2),
+    args: stripDoubleDashSeparator(process.argv.slice(2)),
     allowPositionals: true,
     options: {
       config: { type: 'string' },
