@@ -43,12 +43,12 @@ export async function walkFiles(root: string): Promise<string[]> {
 
   /**
    * 指定ディレクトリを再帰的に走査して `result` へ追加する内部ヘルパー。
-   * @param dir 走査対象ディレクトリの絶対パス
+   * @param directory 走査対象ディレクトリの絶対パス
    */
-  async function walk(dir: string): Promise<void> {
+  async function walk(directory: string): Promise<void> {
     let entries: import('node:fs').Dirent[]
     try {
-      entries = await fs.readdir(dir, { withFileTypes: true })
+      entries = await fs.readdir(directory, { withFileTypes: true })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return
@@ -57,7 +57,7 @@ export async function walkFiles(root: string): Promise<string[]> {
     }
 
     for (const entry of entries) {
-      const absolutePath = path.join(dir, entry.name)
+      const absolutePath = path.join(directory, entry.name)
       if (entry.isDirectory()) {
         await walk(absolutePath)
         continue
@@ -88,18 +88,18 @@ export function globToRegExp(pattern: string): RegExp {
     return cached
   }
   let regExpSource = ''
-  for (let i = 0; i < pattern.length; i++) {
-    const char = pattern[i]
+  for (let index = 0; index < pattern.length; index++) {
+    const char = pattern[index]
     if (char === '*') {
-      if (pattern[i + 1] === '*') {
-        if (pattern[i + 2] === '/') {
+      if (pattern[index + 1] === '*') {
+        if (pattern[index + 2] === '/') {
           // `**/` -> 0 階層以上のディレクトリにマッチ
           regExpSource += '(?:.*/)?'
-          i += 2
+          index += 2
         } else {
           // `**` -> パス区切りを含む任意長
           regExpSource += '.*'
-          i += 1
+          index += 1
         }
       } else {
         // `*` -> パス区切りを含まない任意長
@@ -124,7 +124,7 @@ export function globToRegExp(pattern: string): RegExp {
  * @param targetPath 判定対象のパス (POSIX 区切り)
  * @returns 一致する場合 true
  */
-export function matchGlob(pattern: string, targetPath: string): boolean {
+export function isMatchGlob(pattern: string, targetPath: string): boolean {
   return globToRegExp(pattern).test(targetPath)
 }
 
@@ -134,6 +134,9 @@ export function matchGlob(pattern: string, targetPath: string): boolean {
  * @param targetPath 判定対象のパス (POSIX 区切り)
  * @returns いずれかに一致する場合 true
  */
-export function matchAnyGlob(patterns: string[], targetPath: string): boolean {
-  return patterns.some((pattern) => matchGlob(pattern, targetPath))
+export function isMatchAnyGlob(
+  patterns: string[],
+  targetPath: string
+): boolean {
+  return patterns.some((pattern) => isMatchGlob(pattern, targetPath))
 }

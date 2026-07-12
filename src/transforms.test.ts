@@ -8,43 +8,46 @@ import {
 
 describe('getByPointer', () => {
   test('ネストしたパスの値を取得できる', () => {
-    const obj = { hooks: { Stop: [{ matcher: '' }] } }
-    expect(getByPointer(obj, '/hooks/Stop/0/matcher')).toBe('')
+    const object = { hooks: { Stop: [{ matcher: '' }] } }
+    expect(getByPointer(object, '/hooks/Stop/0/matcher')).toBe('')
   })
 
   test('存在しないパスは undefined を返す', () => {
-    const obj = { hooks: {} }
-    expect(getByPointer(obj, '/hooks/Stop')).toBeUndefined()
+    const object = { hooks: {} }
+    expect(getByPointer(object, '/hooks/Stop')).toBeUndefined()
   })
 })
 
 describe('removeByPointer', () => {
   test('指定したキーを削除する', () => {
-    const obj: Record<string, unknown> = { hooks: { Stop: [] }, theme: 'dark' }
-    removeByPointer(obj, '/hooks')
-    expect(obj, 'hooks キーが削除され theme は残ること').toEqual({
+    const object: Record<string, unknown> = {
+      hooks: { Stop: [] },
+      theme: 'dark',
+    }
+    removeByPointer(object, '/hooks')
+    expect(object, 'hooks キーが削除され theme は残ること').toEqual({
       theme: 'dark',
     })
   })
 
   test('親パスが存在しない場合は何もしない', () => {
-    const obj: Record<string, unknown> = { theme: 'dark' }
-    removeByPointer(obj, '/hooks/Stop')
-    expect(obj, '何も変化しないこと').toEqual({ theme: 'dark' })
+    const object: Record<string, unknown> = { theme: 'dark' }
+    removeByPointer(object, '/hooks/Stop')
+    expect(object, '何も変化しないこと').toEqual({ theme: 'dark' })
   })
 })
 
 describe('setByPointer', () => {
   test('既存オブジェクトに値を設定する', () => {
-    const obj: Record<string, unknown> = { theme: 'light' }
-    setByPointer(obj, '/theme', 'dark-daltonized')
-    expect(obj.theme).toBe('dark-daltonized')
+    const object: Record<string, unknown> = { theme: 'light' }
+    setByPointer(object, '/theme', 'dark-daltonized')
+    expect(object.theme).toBe('dark-daltonized')
   })
 
   test('中間オブジェクトが存在しない場合は新規作成する', () => {
-    const obj: Record<string, unknown> = {}
-    setByPointer(obj, '/a/b/c', 1)
-    expect(obj, '中間オブジェクトが自動生成されること').toEqual({
+    const object: Record<string, unknown> = {}
+    setByPointer(object, '/a/b/c', 1)
+    expect(object, '中間オブジェクトが自動生成されること').toEqual({
       a: { b: { c: 1 } },
     })
   })

@@ -6,7 +6,7 @@ import * as fs from 'node:fs/promises'
 import path from 'node:path'
 import { ChezmoiAttributes, resolveChezmoiPath } from './chezmoi-name'
 import { StageConfig } from './config'
-import { expandHome, matchAnyGlob, walkFiles } from './fsutil'
+import { expandHome, isMatchAnyGlob, walkFiles } from './fsutil'
 import { applyJsonTransform } from './transforms'
 
 /** プラン上のアクション種別 */
@@ -53,25 +53,25 @@ interface ExpectedEntry {
  * ソースディレクトリを走査し、ステージの managed/ignore/transforms を適用した
  * 「期待される実名エントリ集合」を算出する。
  * @param stage ステージ設定
- * @param sourceDir 展開済みのソースディレクトリ絶対パス
+ * @param sourceDirectory 展開済みのソースディレクトリ絶対パス
  * @returns 実名相対パス (POSIX) → 期待エントリ のマップ
  */
 async function buildExpectedEntries(
   stage: StageConfig,
-  sourceDir: string
+  sourceDirectory: string
 ): Promise<Map<string, ExpectedEntry>> {
   const expected = new Map<string, ExpectedEntry>()
-  const sourceFiles = await walkFiles(sourceDir)
+  const sourceFiles = await walkFiles(sourceDirectory)
 
-  for (const relPath of sourceFiles) {
+  for (const relativePath of sourceFiles) {
     // ソース名に対する ignore 判定 (chezmoi 命名変換前)
-    if (matchAnyGlob(stage.ignore, relPath)) {
+    if (isMatchAnyGlob(stage.ignore, relativePath)) {
       continue
     }
 
-    let targetRel = relPath
+    let targetRelative = relativePath
     let type: 'file' | 'symlink' = 'file'
-    let attrs: ChezmoiAttributes = {
+    let attributes: ChezmoiAttributes = {
       private: false,
       readonly: false,
       executable: false,
@@ -79,42 +79,42 @@ async function buildExpectedEntries(
     }
 
     if (stage.chezmoiNaming) {
-      const resolved = resolveChezmoiPath(relPath)
+      const resolved = resolveChezmoiPath(relativePath)
       if (resolved.ignore) {
         continue
       }
-      targetRel = resolved.targetPath
+      targetRelative = resolved.targetPath
       type = resolved.type === 'symlink' ? 'symlink' : 'file'
-      attrs = resolved.attrs
+      attributes = resolved.attrs
     } else {
       // chezmoiNaming: false の場合も lstat でシンボリックリンクを検出する
-      const absSrc = path.join(sourceDir, ...relPath.split('/'))
-      const srcStat = await fs.lstat(absSrc)
-      if (srcStat.isSymbolicLink()) {
+      const absSource = path.join(sourceDirectory, ...relativePath.split('/'))
+      const sourceStat = await fs.lstat(absSource)
+      if (sourceStat.isSymbolicLink()) {
         type = 'symlink'
       }
     }
 
     // 変換後の実名に対する managed 判定
-    if (!matchAnyGlob(stage.managed, targetRel)) {
+    if (!isMatchAnyGlob(stage.managed, targetRelative)) {
       continue
     }
 
-    const absSource = path.join(sourceDir, ...relPath.split('/'))
+    const absSource = path.join(sourceDirectory, ...relativePath.split('/'))
 
     if (type === 'symlink') {
       const symlinkTarget = await fs.readlink(absSource)
-      expected.set(targetRel, {
+      expected.set(targetRelative, {
         type,
         symlinkTarget,
-        attrs,
+        attrs: attributes,
         sourcePath: absSource,
       })
       continue
     }
 
     let content = await fs.readFile(absSource)
-    const transform = stage.transforms.find((t) => t.path === targetRel)
+    const transform = stage.transforms.find((t) => t.path === targetRelative)
     if (transform) {
       try {
         content = Buffer.from(
@@ -123,11 +123,16 @@ async function buildExpectedEntries(
         )
       } catch (error) {
         throw new Error(
-          `Failed to apply transform to "${targetRel}": ${error instanceof Error ? error.message : String(error)}`
+          `Failed to apply transform to "${targetRelative}": ${error instanceof Error ? error.message : String(error)}`
         )
       }
     }
-    expected.set(targetRel, { type, content, attrs, sourcePath: absSource })
+    expected.set(targetRelative, {
+      type,
+      content,
+      attrs: attributes,
+      sourcePath: absSource,
+    })
   }
 
   return expected
@@ -135,43 +140,45 @@ async function buildExpectedEntries(
 
 /**
  * dest 側の既存エントリと期待エントリを比較し、アクションと理由を決定する。
- * @param destPath dest 側の絶対パス
+ * @param destinationPath dest 側の絶対パス
  * @param expected 期待エントリ
  * @returns アクションと理由
  */
 async function decideAction(
-  destPath: string,
+  destinationPath: string,
   expected: ExpectedEntry
 ): Promise<{ action: PlanAction; reason: string }> {
-  const destStat = await fs.lstat(destPath).catch((error: unknown) => {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null
+  let destinationStat: Awaited<ReturnType<typeof fs.lstat>> | undefined
+  try {
+    destinationStat = await fs.lstat(destinationPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error
     }
-    throw error
-  })
+  }
 
-  if (!destStat) {
+  if (!destinationStat) {
     return { action: 'create', reason: 'dest に存在しない' }
   }
 
   if (expected.type === 'symlink') {
-    if (!destStat.isSymbolicLink()) {
+    if (!destinationStat.isSymbolicLink()) {
       return { action: 'update', reason: 'dest が symlink ではない' }
     }
-    const currentTarget = await fs.readlink(destPath)
+    const currentTarget = await fs.readlink(destinationPath)
     return currentTarget === expected.symlinkTarget
       ? { action: 'skip', reason: '差分なし' }
       : { action: 'update', reason: 'symlink の参照先が異なる' }
   }
 
-  if (destStat.isDirectory()) {
+  if (destinationStat.isDirectory()) {
     return { action: 'update', reason: 'dest が同名のディレクトリになっている' }
   }
-  if (destStat.isSymbolicLink()) {
+  if (destinationStat.isSymbolicLink()) {
     return { action: 'update', reason: 'dest が symlink になっている' }
   }
 
-  const currentContent = await fs.readFile(destPath)
+  const currentContent = await fs.readFile(destinationPath)
   return currentContent.equals(expected.content ?? Buffer.alloc(0))
     ? { action: 'skip', reason: '差分なし' }
     : { action: 'update', reason: '内容が異なる' }
@@ -183,27 +190,30 @@ async function decideAction(
  * @returns ステージとプラン項目一覧
  */
 export async function planStage(stage: StageConfig): Promise<StagePlan> {
-  const sourceDir = expandHome(stage.source)
-  const destDir = expandHome(stage.dest)
+  const sourceDirectory = expandHome(stage.source)
+  const destinationDirectory = expandHome(stage.dest)
   const items: PlanItem[] = []
 
-  const expected = await buildExpectedEntries(stage, sourceDir)
+  const expected = await buildExpectedEntries(stage, sourceDirectory)
 
-  for (const [targetRel, entry] of expected) {
+  for (const [targetRelative, entry] of expected) {
     // protected は create/update からも常に除外する
-    if (matchAnyGlob(stage.protected, targetRel)) {
+    if (isMatchAnyGlob(stage.protected, targetRelative)) {
       continue
     }
 
-    const destPath = path.join(destDir, ...targetRel.split('/'))
-    const { action, reason } = await decideAction(destPath, entry)
+    const destinationPath = path.join(
+      destinationDirectory,
+      ...targetRelative.split('/')
+    )
+    const { action, reason } = await decideAction(destinationPath, entry)
 
     items.push({
-      relPath: targetRel,
+      relPath: targetRelative,
       action,
       type: entry.type,
       sourcePath: entry.sourcePath,
-      destPath,
+      destPath: destinationPath,
       content: entry.content,
       symlinkTarget: entry.symlinkTarget,
       attrs: entry.attrs,
@@ -212,26 +222,26 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
   }
 
   if (stage.mirror) {
-    const destFiles = await walkFiles(destDir)
-    for (const relPath of destFiles) {
+    const destinationFiles = await walkFiles(destinationDirectory)
+    for (const relativePath of destinationFiles) {
       // protected は削除対象から常に除外する (最優先ガード)
-      if (matchAnyGlob(stage.protected, relPath)) {
+      if (isMatchAnyGlob(stage.protected, relativePath)) {
         continue
       }
       // managed 範囲外の実名ファイルは管理しない (削除しない)
-      if (!matchAnyGlob(stage.managed, relPath)) {
+      if (!isMatchAnyGlob(stage.managed, relativePath)) {
         continue
       }
       // 期待集合に含まれていれば create/update 側で処理済み
-      if (expected.has(relPath)) {
+      if (expected.has(relativePath)) {
         continue
       }
 
       items.push({
-        relPath,
+        relPath: relativePath,
         action: 'delete',
         type: 'file',
-        destPath: path.join(destDir, ...relPath.split('/')),
+        destPath: path.join(destinationDirectory, ...relativePath.split('/')),
         reason: 'ソースに存在しない managed ファイル (mirror 削除)',
       })
     }

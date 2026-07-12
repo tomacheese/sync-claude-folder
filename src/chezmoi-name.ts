@@ -54,7 +54,7 @@ export interface ResolvedChezmoiPath {
  * 全属性が false のデフォルト `ChezmoiAttributes` を返す。
  * @returns デフォルト属性オブジェクト
  */
-function defaultAttrs(): ChezmoiAttributes {
+function defaultAttributes(): ChezmoiAttributes {
   return { private: false, readonly: false, executable: false, exact: false }
 }
 
@@ -82,18 +82,18 @@ const IGNORED_PREFIXES = [
  */
 export function resolveChezmoiName(sourceName: string): ResolvedChezmoiName {
   let name = sourceName
-  const attrs = defaultAttrs()
+  const attributes = defaultAttributes()
   let type: ChezmoiEntryType = 'file'
 
   // .tmpl はテンプレートエンジン未対応のため ignore
   if (name.endsWith('.tmpl')) {
-    return { name, type, attrs, ignore: true }
+    return { name, type, attrs: attributes, ignore: true }
   }
 
   // run_*/create_* 等の実行・スクリプト系プレフィックスは ignore
   for (const prefix of IGNORED_PREFIXES) {
     if (name.startsWith(prefix)) {
-      return { name, type, attrs, ignore: true }
+      return { name, type, attrs: attributes, ignore: true }
     }
   }
 
@@ -104,71 +104,76 @@ export function resolveChezmoiName(sourceName: string): ResolvedChezmoiName {
   }
 
   // literal_ / .literal が出現するまで private_/readonly_/executable_/exact_ を繰り返し解析する
-  let literal = false
-  let changed = true
-  while (changed && !literal) {
-    changed = false
+  let isLiteral = false
+  let hasChanged = true
+  while (hasChanged && !isLiteral) {
+    hasChanged = false
     if (name.startsWith('private_')) {
-      attrs.private = true
+      attributes.private = true
       name = name.slice('private_'.length)
-      changed = true
+      hasChanged = true
     } else if (name.startsWith('readonly_')) {
-      attrs.readonly = true
+      attributes.readonly = true
       name = name.slice('readonly_'.length)
-      changed = true
+      hasChanged = true
     } else if (name.startsWith('executable_')) {
-      attrs.executable = true
+      attributes.executable = true
       name = name.slice('executable_'.length)
-      changed = true
+      hasChanged = true
     } else if (name.startsWith('exact_')) {
-      attrs.exact = true
+      attributes.exact = true
       if (type !== 'symlink') {
         type = 'dir'
       }
       name = name.slice('exact_'.length)
-      changed = true
+      hasChanged = true
     } else if (name.startsWith('literal_')) {
-      literal = true
+      isLiteral = true
       name = name.slice('literal_'.length)
     } else if (name.endsWith('.literal')) {
-      literal = true
+      isLiteral = true
       name = name.slice(0, -'.literal'.length)
     }
   }
 
   // literal 指定が無い場合のみ dot_ → '.' 変換を行う
-  if (!literal && name.startsWith('dot_')) {
+  if (!isLiteral && name.startsWith('dot_')) {
     name = '.' + name.slice('dot_'.length)
   }
 
-  return { name, type, attrs, ignore: false }
+  return { name, type, attrs: attributes, ignore: false }
 }
 
 /**
  * ソース相対パス (POSIX 区切り) を実名パスへ解決する。
  * パス中の各セグメントに {@link resolveChezmoiName} を適用し、
  * いずれかのセグメントが ignore 対象であれば全体を ignore とする。
- * @param relPath ソースディレクトリからの相対パス (POSIX 区切り)
+ * @param relativePath ソースディレクトリからの相対パス (POSIX 区切り)
  * @returns 解決結果
  */
-export function resolveChezmoiPath(relPath: string): ResolvedChezmoiPath {
-  const segments = relPath.split('/')
+export function resolveChezmoiPath(relativePath: string): ResolvedChezmoiPath {
+  const segments = relativePath.split('/')
   const targetSegments: string[] = []
-  let ignore = false
+  let isIgnored = false
   let type: ChezmoiEntryType = 'file'
-  let attrs = defaultAttrs()
+  let attributes = defaultAttributes()
 
   for (const [index, segment] of segments.entries()) {
     const resolved = resolveChezmoiName(segment)
     if (resolved.ignore) {
-      ignore = true
+      isIgnored = true
     }
     targetSegments.push(resolved.name)
     if (index === segments.length - 1) {
       type = resolved.type
-      attrs = resolved.attrs
+      attributes = resolved.attrs
     }
   }
 
-  return { targetPath: targetSegments.join('/'), type, attrs, ignore }
+  return {
+    targetPath: targetSegments.join('/'),
+    type,
+    attrs: attributes,
+    ignore: isIgnored,
+  }
 }

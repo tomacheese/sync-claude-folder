@@ -94,16 +94,16 @@ function validateConfig(value: unknown, configPath: string): void {
       }
     }
     for (const key of ['managed', 'ignore', 'protected'] as const) {
-      const arr = stageConfig[key]
-      if (!Array.isArray(arr)) {
+      const array = stageConfig[key]
+      if (!Array.isArray(array)) {
         throw new TypeError(
           `Invalid config: stages[${index}].${key} must be an array`
         )
       }
-      for (const [i, item] of arr.entries()) {
+      for (const [index_, item] of array.entries()) {
         if (typeof item !== 'string') {
           throw new TypeError(
-            `Invalid config: stages[${index}].${key}[${i}] must be a string`
+            `Invalid config: stages[${index}].${key}[${index_}] must be a string`
           )
         }
       }
@@ -114,21 +114,21 @@ function validateConfig(value: unknown, configPath: string): void {
         `Invalid config: stages[${index}].transforms must be an array`
       )
     }
-    for (const [i, t] of transforms.entries()) {
+    for (const [index_, t] of transforms.entries()) {
       const transform = t as Partial<JsonTransform>
       if (typeof transform.path !== 'string') {
         throw new TypeError(
-          `Invalid config: stages[${index}].transforms[${i}].path must be a string`
+          `Invalid config: stages[${index}].transforms[${index_}].path must be a string`
         )
       }
       if (transform.type !== 'json') {
         throw new TypeError(
-          `Invalid config: stages[${index}].transforms[${i}].type must be "json"`
+          `Invalid config: stages[${index}].transforms[${index_}].type must be "json"`
         )
       }
       if (!Array.isArray(transform.ops)) {
         throw new TypeError(
-          `Invalid config: stages[${index}].transforms[${i}].ops must be an array`
+          `Invalid config: stages[${index}].transforms[${index_}].ops must be an array`
         )
       }
     }

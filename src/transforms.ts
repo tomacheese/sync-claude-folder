@@ -35,12 +35,12 @@ function parsePointer(pointer: string): string[] {
 
 /**
  * JSON Pointer が指す値を取得する。
- * @param obj 対象オブジェクト
+ * @param object 対象オブジェクト
  * @param pointer JSON Pointer
  * @returns 指す値。存在しない場合は undefined
  */
-export function getByPointer(obj: unknown, pointer: string): unknown {
-  let current = obj
+export function getByPointer(object: unknown, pointer: string): unknown {
+  let current = object
   for (const token of parsePointer(pointer)) {
     if (current === null || typeof current !== 'object') {
       return undefined
@@ -53,21 +53,21 @@ export function getByPointer(obj: unknown, pointer: string): unknown {
 /**
  * JSON Pointer が指す値を削除する (破壊的)。
  * 親パスが存在しない場合は何もしない。
- * @param obj 対象オブジェクト
+ * @param object 対象オブジェクト
  * @param pointer JSON Pointer (ルートは指定不可)
  * @throws ルート (`""`) を指定した場合 Error
  */
 export function removeByPointer(
-  obj: Record<string, unknown>,
+  object: Record<string, unknown>,
   pointer: string
 ): void {
   const tokens = parsePointer(pointer)
   if (tokens.length === 0) {
     throw new Error('Cannot remove the root of a JSON document')
   }
-  let current: Record<string, unknown> = obj
-  for (let i = 0; i < tokens.length - 1; i++) {
-    const next = current[tokens[i]]
+  let current: Record<string, unknown> = object
+  for (let index = 0; index < tokens.length - 1; index++) {
+    const next = current[tokens[index]]
     if (typeof next !== 'object' || next === null) {
       // 親パスが存在しない場合は削除対象も存在しないとみなし、何もしない
       return
@@ -83,13 +83,13 @@ export function removeByPointer(
 /**
  * JSON Pointer が指す値を設定する (破壊的)。
  * 中間オブジェクトが存在しない場合は新規作成する。
- * @param obj 対象オブジェクト
+ * @param object 対象オブジェクト
  * @param pointer JSON Pointer (ルートは指定不可)
  * @param value 設定する値
  * @throws ルート (`""`) を指定した場合 Error
  */
 export function setByPointer(
-  obj: Record<string, unknown>,
+  object: Record<string, unknown>,
   pointer: string,
   value: unknown
 ): void {
@@ -97,9 +97,9 @@ export function setByPointer(
   if (tokens.length === 0) {
     throw new Error('Cannot set the root of a JSON document')
   }
-  let current: Record<string, unknown> = obj
-  for (let i = 0; i < tokens.length - 1; i++) {
-    const token = tokens[i]
+  let current: Record<string, unknown> = object
+  for (let index = 0; index < tokens.length - 1; index++) {
+    const token = tokens[index]
     const next = current[token]
     if (typeof next !== 'object' || next === null) {
       current[token] = {}
@@ -143,6 +143,31 @@ export function deepMerge<T extends Record<string, unknown>>(
 }
 
 /**
+ * transform 操作 1 件を適用し、適用後のデータを返す。
+ * @param data 適用前のデータ
+ * @param op 適用する操作
+ * @returns 適用後のデータ
+ */
+function applyOp(
+  data: Record<string, unknown>,
+  op: TransformOp
+): Record<string, unknown> {
+  switch (op.op) {
+    case 'remove': {
+      removeByPointer(data, op.pointer)
+      return data
+    }
+    case 'set': {
+      setByPointer(data, op.pointer, op.value)
+      return data
+    }
+    case 'merge': {
+      return deepMerge(data, op.value)
+    }
+  }
+}
+
+/**
  * JSON テキストに transform 操作 (remove / set / merge) を順に適用する。
  * @param content 変換対象の JSON テキスト
  * @param ops 適用する操作の配列 (先頭から順に適用)
@@ -154,20 +179,7 @@ export function applyJsonTransform(
 ): string {
   let data = JSON.parse(content) as Record<string, unknown>
   for (const op of ops) {
-    switch (op.op) {
-      case 'remove': {
-        removeByPointer(data, op.pointer)
-        break
-      }
-      case 'set': {
-        setByPointer(data, op.pointer, op.value)
-        break
-      }
-      case 'merge': {
-        data = deepMerge(data, op.value)
-        break
-      }
-    }
+    data = applyOp(data, op)
   }
   return `${JSON.stringify(data, null, 2)}\n`
 }

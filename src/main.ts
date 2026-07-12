@@ -64,20 +64,20 @@ function printStagePlan(plan: StagePlan): void {
  * `sync` サブコマンドを実行する。
  * @param configPath config.json への絶対パス
  * @param stageName 対象ステージ名 (未指定の場合は全ステージ)
- * @param apply true の場合のみ実際にファイルを書き込む
+ * @param shouldApply true の場合のみ実際にファイルを書き込む
  * @param backupRoot バックアップ先ルートディレクトリ
  */
 async function runSync(
   configPath: string,
   stageName: string | undefined,
-  apply: boolean,
+  shouldApply: boolean,
   backupRoot: string
 ): Promise<void> {
   const config = loadConfig(configPath)
   const stages: StageConfig[] = selectStages(config, stageName)
 
   console.log(
-    apply
+    shouldApply
       ? 'Mode: apply (ファイルを書き込みます)'
       : 'Mode: dry-run (計画のみ表示します)'
   )
@@ -87,8 +87,11 @@ async function runSync(
     const plan = await planStage(stage)
     printStagePlan(plan)
 
-    const result = await applyStagePlan(plan, { apply, backupRoot })
-    if (apply) {
+    const result = await applyStagePlan(plan, {
+      apply: shouldApply,
+      backupRoot,
+    })
+    if (shouldApply) {
       console.log(
         `  applied: created=${result.created}, updated=${result.updated}, deleted=${result.deleted}`
       )
@@ -120,15 +123,15 @@ function printUsage(): void {
  * (例: `--config --`) や、利用者が意図的に 2 個目の `--` を「これ以降は
  * すべて positional として扱う」終端記号として使うケースの標準的な
  * `parseArgs` の挙動を壊さない。
- * @param args 生の CLI 引数配列
+ * @param arguments_ 生の CLI 引数配列
  * @returns pnpm 由来の先頭の `--` のみを除いた引数配列
  */
-export function stripDoubleDashSeparator(args: string[]): string[] {
-  const index = args.indexOf('--')
+export function stripDoubleDashSeparator(arguments_: string[]): string[] {
+  const index = arguments_.indexOf('--')
   if (index === -1) {
-    return args
+    return arguments_
   }
-  return [...args.slice(0, index), ...args.slice(index + 1)]
+  return [...arguments_.slice(0, index), ...arguments_.slice(index + 1)]
 }
 
 /** CLI のエントリポイント */
@@ -151,11 +154,11 @@ async function main(): Promise<void> {
   const backupRoot = values['backup-root']
     ? path.resolve(expandHome(values['backup-root']))
     : DEFAULT_BACKUP_ROOT
-  const apply = values.apply
+  const shouldApply = values.apply
 
   switch (command) {
     case 'sync': {
-      await runSync(configPath, values.stage, apply, backupRoot)
+      await runSync(configPath, values.stage, shouldApply, backupRoot)
       return
     }
     default: {
@@ -167,8 +170,12 @@ async function main(): Promise<void> {
 
 // eslint-disable-next-line unicorn/prefer-module -- CommonJS 構成のため require.main で判定する
 if (require.main === module) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error))
-    process.exitCode = 1
-  })
+  ;(async () => {
+    try {
+      await main()
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error))
+      process.exitCode = 1
+    }
+  })()
 }

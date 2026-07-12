@@ -47,55 +47,57 @@ export function buildTimestamp(): string {
 
 /**
  * dest の既存ファイルをバックアップ先へコピーする (存在しない場合は何もしない)。
- * @param destPath dest 側の絶対パス
+ * @param destinationPath dest 側の絶対パス
  * @param backupPath バックアップ先の絶対パス
  */
 async function backupExisting(
-  destPath: string,
+  destinationPath: string,
   backupPath: string
 ): Promise<void> {
-  const stat = await fs.lstat(destPath).catch((error: unknown) => {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null
+  let stat: Awaited<ReturnType<typeof fs.lstat>> | undefined
+  try {
+    stat = await fs.lstat(destinationPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error
     }
-    throw error
-  })
+  }
   if (!stat) {
     return
   }
 
   await fs.mkdir(path.dirname(backupPath), { recursive: true })
   if (stat.isSymbolicLink()) {
-    const linkTarget = await fs.readlink(destPath)
+    const linkTarget = await fs.readlink(destinationPath)
     await fs.symlink(linkTarget, backupPath)
     return
   }
   if (stat.isDirectory()) {
-    await fs.cp(destPath, backupPath, { recursive: true })
+    await fs.cp(destinationPath, backupPath, { recursive: true })
     return
   }
-  await fs.copyFile(destPath, backupPath)
+  await fs.copyFile(destinationPath, backupPath)
 }
 
 /**
  * chezmoi 属性をファイルへ best-effort で反映する。
  * Windows 等で chmod が失敗した場合は警告を出力するのみで処理を継続する。
  * @param filePath 対象ファイルの絶対パス
- * @param attrs chezmoi 属性
+ * @param attributes chezmoi 属性
  */
-async function applyAttrs(
+async function applyAttributes(
   filePath: string,
-  attrs: PlanItem['attrs']
+  attributes: PlanItem['attrs']
 ): Promise<void> {
-  if (!attrs) {
+  if (!attributes) {
     return
   }
   let mode: number | undefined
-  if (attrs.private) {
+  if (attributes.private) {
     mode = 0o600
-  } else if (attrs.readonly) {
+  } else if (attributes.readonly) {
     mode = 0o444
-  } else if (attrs.executable) {
+  } else if (attributes.executable) {
     mode = 0o755
   }
   if (mode === undefined) {
@@ -156,7 +158,29 @@ async function applyItem(item: PlanItem, options: ApplyOptions): Promise<void> {
     throw new Error(`content is missing for ${item.relPath}`)
   }
   await fs.writeFile(item.destPath, item.content)
-  await applyAttrs(item.destPath, item.attrs)
+  await applyAttributes(item.destPath, item.attrs)
+}
+
+/**
+ * プランアクションを集計結果 (ApplyResult) のキーへ変換する。
+ * @param action プランアクション
+ * @returns 対応する ApplyResult のキー
+ */
+function resultKeyForAction(action: PlanItem['action']): keyof ApplyResult {
+  switch (action) {
+    case 'create': {
+      return 'created'
+    }
+    case 'update': {
+      return 'updated'
+    }
+    case 'delete': {
+      return 'deleted'
+    }
+    case 'skip': {
+      return 'skipped'
+    }
+  }
 }
 
 /**
@@ -174,24 +198,7 @@ export async function applyStagePlan(
   const resolvedOptions: ApplyOptions = { ...options, timestamp }
 
   for (const item of plan.items) {
-    switch (item.action) {
-      case 'create': {
-        result.created++
-        break
-      }
-      case 'update': {
-        result.updated++
-        break
-      }
-      case 'delete': {
-        result.deleted++
-        break
-      }
-      case 'skip': {
-        result.skipped++
-        break
-      }
-    }
+    result[resultKeyForAction(item.action)]++
     await applyItem(item, resolvedOptions)
   }
 
