@@ -45,7 +45,7 @@
     "tsx": "4.23.13",
     "typescript": "6.0.3"
   },
-  "packageManager": "pnpm@12.3.2",
+  "packageManager": "pnpm@12.3.4",
   "jest": {
     "transform": {
       "^.+\\.ts$": [
