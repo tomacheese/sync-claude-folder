@@ -125,10 +125,9 @@ function printUsage(): void {
  */
 export function stripDoubleDashSeparator(args: string[]): string[] {
   const index = args.indexOf('--')
-  if (index === -1) {
-    return args
-  }
-  return [...args.slice(0, index), ...args.slice(index + 1)]
+  return index === -1
+    ? args
+    : [...args.slice(0, index), ...args.slice(index + 1)]
 }
 
 /** CLI のエントリポイント */

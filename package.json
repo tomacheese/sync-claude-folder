@@ -29,7 +29,7 @@
     "preinstall": "npx only-allow pnpm"
   },
   "devDependencies": {
-    "@book000/eslint-config": "1.16.66",
+    "@book000/eslint-config": "1.16.67",
     "@types/jest": "30.0.0",
     "@types/node": "24.13.5",
     "eslint": "10.10.0",
@@ -45,7 +45,7 @@
     "tsx": "4.23.13",
     "typescript": "6.0.3"
   },
-  "packageManager": "pnpm@12.4.2",
+  "packageManager": "pnpm@12.4.2+sha512.08adc6613180275c7c9edada39dcf08c9c61ad4e7eaf330a4f3461f102b0f907423454d117f98e72d47fef0616070644d7bffc973a6a57f5090a6d7c368b07c9",
   "jest": {
     "transform": {
       "^.+\\.ts$": [
@@ -55,9 +55,20 @@
         }
       ]
     },
-    "moduleFileExtensions": ["js", "ts"],
-    "setupFilesAfterEnv": ["jest-expect-message"],
-    "testMatch": ["**/*.test.ts"],
-    "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.d.ts", "!src/main.ts"]
+    "moduleFileExtensions": [
+      "js",
+      "ts"
+    ],
+    "setupFilesAfterEnv": [
+      "jest-expect-message"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/main.ts"
+    ]
   }
 }

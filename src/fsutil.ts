@@ -16,10 +16,9 @@ export function expandHome(targetPath: string): string {
   if (targetPath === '~') {
     return os.homedir()
   }
-  if (targetPath.startsWith('~/') || targetPath.startsWith('~\\')) {
-    return path.join(os.homedir(), targetPath.slice(2))
-  }
-  return targetPath
+  return targetPath.startsWith('~/') || targetPath.startsWith('~\\')
+    ? path.join(os.homedir(), targetPath.slice(2))
+    : targetPath
 }
 
 /**
