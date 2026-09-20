@@ -164,10 +164,12 @@ export function resolveChezmoiPath(relPath: string): ResolvedChezmoiPath {
       ignore = true
     }
     targetSegments.push(resolved.name)
-    if (index === segments.length - 1) {
-      type = resolved.type
-      attrs = resolved.attrs
+    if (index !== segments.length - 1) {
+      continue
     }
+
+    type = resolved.type
+    attrs = resolved.attrs
   }
 
   return { targetPath: targetSegments.join('/'), type, attrs, ignore }
