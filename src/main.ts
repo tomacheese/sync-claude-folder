@@ -9,7 +9,7 @@
 import * as os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { applyStagePlan } from './apply'
+import { applyStagePlan, buildTimestamp } from './apply'
 import { loadConfig, selectStages, StageConfig } from './config'
 import { expandHome } from './fsutil'
 import { PlanItem, planStage, StagePlan } from './planner'
@@ -67,7 +67,7 @@ function printStagePlan(plan: StagePlan): void {
  * @param apply true の場合のみ実際にファイルを書き込む
  * @param backupRoot バックアップ先ルートディレクトリ
  */
-async function runSync(
+export async function runSync(
   configPath: string,
   stageName: string | undefined,
   apply: boolean,
@@ -83,11 +83,16 @@ async function runSync(
   )
   console.log('')
 
+  const timestamp = buildTimestamp()
   for (const stage of stages) {
     const plan = await planStage(stage)
     printStagePlan(plan)
 
-    const result = await applyStagePlan(plan, { apply, backupRoot })
+    const result = await applyStagePlan(plan, {
+      apply,
+      backupRoot,
+      timestamp,
+    })
     if (apply) {
       console.log(
         `  applied: created=${result.created}, updated=${result.updated}, deleted=${result.deleted}`

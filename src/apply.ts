@@ -45,8 +45,21 @@ export function buildTimestamp(): string {
   return `${date}T${time}`
 }
 
+/** 既存バックアップとの衝突を表す Node.js のエラーコード */
+const BACKUP_CONFLICT_CODES = new Set(['EEXIST', 'ERR_FS_CP_EEXIST'])
+
 /**
- * dest の既存ファイルをバックアップ先へコピーする (存在しない場合は何もしない)。
+ * バックアップ先が既に存在することを示すエラーを生成する。
+ * @param backupPath バックアップ先の絶対パス
+ * @returns 衝突を示す Error
+ */
+function backupConflictError(backupPath: string): Error {
+  return new Error(`Backup destination already exists: ${backupPath}`)
+}
+
+/**
+ * dest の既存エントリをバックアップ先へコピーする (存在しない場合は何もしない)。
+ * 既存のバックアップは上書きせず、衝突した場合は dest を変更する前に中断する。
  * @param destPath dest 側の絶対パス
  * @param backupPath バックアップ先の絶対パス
  */
@@ -64,17 +77,37 @@ async function backupExisting(
     return
   }
 
+  // fs.cp は既存の空ディレクトリへのコピーを検出せずマージするため、種別によらず事前に確認する
+  const existing = await fs.lstat(backupPath).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null
+    }
+    throw error
+  })
+  if (existing) {
+    throw backupConflictError(backupPath)
+  }
+
   await fs.mkdir(path.dirname(backupPath), { recursive: true })
-  if (stat.isSymbolicLink()) {
-    const linkTarget = await fs.readlink(destPath)
-    await fs.symlink(linkTarget, backupPath)
-    return
+  try {
+    if (stat.isSymbolicLink()) {
+      await fs.symlink(await fs.readlink(destPath), backupPath)
+    } else if (stat.isDirectory()) {
+      await fs.cp(destPath, backupPath, {
+        recursive: true,
+        force: false,
+        errorOnExist: true,
+      })
+    } else {
+      await fs.copyFile(destPath, backupPath, fs.constants.COPYFILE_EXCL)
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code !== undefined && BACKUP_CONFLICT_CODES.has(code)) {
+      throw backupConflictError(backupPath)
+    }
+    throw error
   }
-  if (stat.isDirectory()) {
-    await fs.cp(destPath, backupPath, { recursive: true })
-    return
-  }
-  await fs.copyFile(destPath, backupPath)
 }
 
 /**
@@ -115,14 +148,24 @@ async function applyAttrs(
  * 1 件分のプランを適用する (apply=false の場合は判定のみ行い書き込まない)。
  * @param item プラン項目
  * @param options apply オプション
+ * @param stageName バックアップ先を stage ごとに分離するための stage 名
  */
-async function applyItem(item: PlanItem, options: ApplyOptions): Promise<void> {
+async function applyItem(
+  item: PlanItem,
+  options: ApplyOptions,
+  stageName: string
+): Promise<void> {
   if (item.action === 'skip') {
     return
   }
 
   const timestamp = options.timestamp ?? buildTimestamp()
-  const backupPath = path.join(options.backupRoot, timestamp, item.relPath)
+  const backupPath = path.join(
+    options.backupRoot,
+    timestamp,
+    stageName,
+    item.relPath
+  )
 
   if (item.action === 'delete') {
     if (!options.apply) {
@@ -192,7 +235,7 @@ export async function applyStagePlan(
         break
       }
     }
-    await applyItem(item, resolvedOptions)
+    await applyItem(item, resolvedOptions, plan.stage.name)
   }
 
   return result
