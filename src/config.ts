@@ -61,6 +61,9 @@ export interface SyncConfig {
   stages: StageConfig[]
 }
 
+/** バックアップ先のパスセグメントに使うため、区切り文字や `.` / `..` を許さない stage 名の形式 */
+const STAGE_NAME_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/
+
 /**
  * config.json の構造を簡易検証する。
  * @param value JSON.parse 直後の値
@@ -77,6 +80,7 @@ function validateConfig(value: unknown, configPath: string): void {
       `Invalid config: "stages" must be an array in ${configPath}`
     )
   }
+  const seenNames = new Set<string>()
   for (const [index, stage] of config.stages.entries()) {
     const stageConfig = stage as Partial<StageConfig>
     for (const key of ['name', 'source', 'dest'] as const) {
@@ -86,6 +90,18 @@ function validateConfig(value: unknown, configPath: string): void {
         )
       }
     }
+    const stageName = String(stageConfig.name)
+    if (!STAGE_NAME_PATTERN.test(stageName)) {
+      throw new Error(
+        `Invalid config: stages[${index}].name "${stageName}" must match ${STAGE_NAME_PATTERN.source}`
+      )
+    }
+    if (seenNames.has(stageName)) {
+      throw new Error(
+        `Invalid config: stages[${index}].name "${stageName}" is duplicated`
+      )
+    }
+    seenNames.add(stageName)
     for (const key of ['chezmoiNaming', 'mirror'] as const) {
       if (typeof stageConfig[key] !== 'boolean') {
         throw new TypeError(

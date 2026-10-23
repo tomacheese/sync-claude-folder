@@ -42,13 +42,18 @@ pnpm sync -- --config ./config.json --apply
 ```
 
 Before writing or deleting, existing files are backed up to
-`~/.sync-claude-backup/<timestamp>/<relPath>` (default; override with `--backup-root`).
+`~/.sync-claude-backup/<timestamp>/<stage.name>/<relPath>` (default; override with `--backup-root`).
+All stages in a single run share one `<timestamp>`, and each stage has its own subdirectory.
+An existing backup is never overwritten: if the backup destination already exists,
+the run aborts with `Backup destination already exists` before the file is modified.
 
 ## config.json
 
 Copy `config.example.json` to `config.json` and edit to match your environment.
 `config.json` is gitignored because it contains machine-specific paths and credentials.
 
+- `stages[].name`: stage identifier used by `--stage` and as the backup subdirectory.
+  It must match `^[A-Za-z0-9_][A-Za-z0-9._-]*$` and be unique within the config
 - `stages[].source` / `dest`: source/destination directories (`~` expansion supported)
 - `chezmoiNaming`: whether to convert source names from chezmoi naming to real names
 - `mirror`: whether to delete real-name files inside `managed` that no longer exist in source
