@@ -1,74 +1,74 @@
 /**
- * 同期設定 (config.json) の型定義・読み込み・検証を行うモジュール。
+ * Type definitions, loading and validation for the sync config (config.json).
  */
 
 import * as fs from 'node:fs'
 
-/** JSON Pointer を削除する transform 操作 */
+/** Transform op that removes the value at a JSON Pointer. */
 export interface TransformOpRemove {
   op: 'remove'
   pointer: string
 }
 
-/** JSON Pointer に値を設定する transform 操作 */
+/** Transform op that sets a value at a JSON Pointer. */
 export interface TransformOpSet {
   op: 'set'
   pointer: string
   value: unknown
 }
 
-/** ルートオブジェクトへ深いマージを行う transform 操作 */
+/** Transform op that deep-merges a value into the root object. */
 export interface TransformOpMerge {
   op: 'merge'
   value: Record<string, unknown>
 }
 
-/** transform 操作の合併型 */
+/** Union of all transform ops. */
 export type TransformOp = TransformOpRemove | TransformOpSet | TransformOpMerge
 
-/** JSON ファイルに対する transform 定義 */
+/** Transform definition for a JSON file. */
 export interface JsonTransform {
-  /** transform 対象の実名パス (変換後・POSIX 区切り) */
+  /** Real-name path of the transform target (after conversion, POSIX separators). */
   path: string
   type: 'json'
   ops: TransformOp[]
 }
 
-/** 同期ステージ 1 件の設定 */
+/** Configuration of one sync stage. */
 export interface StageConfig {
-  /** ステージ名 (CLI の --stage で指定する識別子) */
+  /** Stage name (the identifier passed to the CLI `--stage` option). */
   name: string
-  /** 同期元ディレクトリ (`~` 展開対応) */
+  /** Source directory (`~` expansion supported). */
   source: string
-  /** 同期先ディレクトリ (`~` 展開対応) */
+  /** Destination directory (`~` expansion supported). */
   dest: string
-  /** true の場合、ソース名を chezmoi 命名規則で実名へ変換する */
+  /** When true, source names are converted to real names using chezmoi naming rules. */
   chezmoiNaming: boolean
-  /** true の場合、managed 範囲内でソースに存在しない実名ファイルを削除する */
+  /** When true, real-name files within `managed` that no longer exist in the source are deleted. */
   mirror: boolean
-  /** 同期・ミラー対象とする実名 glob 一覧 */
+  /** Real-name globs to sync and mirror. */
   managed: string[]
-  /** ソース側で無視する glob 一覧 (ソース名に対して判定) */
+  /** Globs ignored on the source side (matched against source names). */
   ignore: string[]
-  /** dest 側で create/update/delete のいずれからも除外する glob 一覧 */
+  /** Globs on the dest side excluded from create, update and delete. */
   protected: string[]
-  /** コピー時に適用する transform 一覧 */
+  /** Transforms applied when copying. */
   transforms: JsonTransform[]
 }
 
-/** config.json 全体の型 */
+/** Shape of the whole config.json. */
 export interface SyncConfig {
   stages: StageConfig[]
 }
 
-/** バックアップ先のパスセグメントに使うため、区切り文字や `.` / `..` を許さない stage 名の形式 */
+/** Stage names are used as a backup path segment, so separators and `.` / `..` are not allowed. */
 const STAGE_NAME_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/
 
 /**
- * config.json の構造を簡易検証する。
- * @param value JSON.parse 直後の値
- * @param configPath エラーメッセージ用のパス
- * @throws 構造が不正な場合 Error
+ * Performs a basic structural validation of config.json.
+ * @param value Value straight from JSON.parse
+ * @param configPath Path used in error messages
+ * @throws Error if the structure is invalid
  */
 function validateConfig(value: unknown, configPath: string): void {
   if (typeof value !== 'object' || value === null) {
@@ -152,10 +152,10 @@ function validateConfig(value: unknown, configPath: string): void {
 }
 
 /**
- * config.json を読み込み、最低限の構造検証を行う。
- * @param configPath config.json への絶対パス
- * @returns 読み込んだ設定
- * @throws 設定が不正な場合 Error
+ * Loads config.json and validates its basic structure.
+ * @param configPath Absolute path to config.json
+ * @returns The loaded config
+ * @throws Error if the config is invalid
  */
 export function loadConfig(configPath: string): SyncConfig {
   const raw = fs.readFileSync(configPath, 'utf8')
@@ -165,11 +165,11 @@ export function loadConfig(configPath: string): SyncConfig {
 }
 
 /**
- * 指定したステージ名を config から取得する。
- * @param config 同期設定
- * @param stageName ステージ名 (未指定の場合は全ステージ)
- * @returns ステージ設定の配列
- * @throws 指定したステージ名が存在しない場合 Error
+ * Selects stages from the config by name.
+ * @param config Sync config
+ * @param stageName Stage name (all stages when omitted)
+ * @returns Selected stage configs
+ * @throws Error if the named stage does not exist
  */
 export function selectStages(
   config: SyncConfig,

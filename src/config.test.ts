@@ -4,9 +4,9 @@ import path from 'node:path'
 import { loadConfig } from './config'
 
 /**
- * 指定した名前の stage を持つ最小構成の config を生成する。
- * @param names stage 名の配列
- * @returns config.json 相当のオブジェクト
+ * Builds a minimal config with stages of the given names.
+ * @param names Stage names
+ * @returns An object equivalent to config.json
  */
 function buildConfig(names: string[]): { stages: Record<string, unknown>[] } {
   return {
@@ -24,7 +24,7 @@ function buildConfig(names: string[]): { stages: Record<string, unknown>[] } {
   }
 }
 
-describe('loadConfig の stage 名検証', () => {
+describe('loadConfig stage name validation', () => {
   let tmpDir: string
 
   beforeEach(() => {
@@ -36,9 +36,9 @@ describe('loadConfig の stage 名検証', () => {
   })
 
   /**
-   * config を temp ディレクトリへ書き出して読み込む。
-   * @param names stage 名の配列
-   * @returns 読み込んだ設定
+   * Writes the config to a temp directory and loads it.
+   * @param names Stage names
+   * @returns The loaded config
    */
   function load(names: string[]): ReturnType<typeof loadConfig> {
     const configPath = path.join(tmpDir, 'config.json')
@@ -46,7 +46,7 @@ describe('loadConfig の stage 名検証', () => {
     return loadConfig(configPath)
   }
 
-  test('有効な stage 名を受理する', () => {
+  test('accepts valid stage names', () => {
     const config = load(['dotfiles-to-claude', 'claude-to-claude-work'])
     expect(config.stages.map((s) => s.name)).toEqual([
       'dotfiles-to-claude',
@@ -62,13 +62,13 @@ describe('loadConfig の stage 名検証', () => {
     [String.raw`a\b`, 0],
     ['.hidden', 0],
     ['with space', 0],
-  ])('不正な stage 名 %j を拒否する', (name, index) => {
+  ])('rejects invalid stage name %j', (name, index) => {
     expect(() => load([name])).toThrow(
       `Invalid config: stages[${index}].name "${name}" must match ^[A-Za-z0-9_][A-Za-z0-9._-]*$`
     )
   })
 
-  test('重複した stage 名は 2 件目を報告して拒否する', () => {
+  test('rejects a duplicated stage name, reporting the second occurrence', () => {
     expect(() => load(['stage-a', 'stage-b', 'stage-a'])).toThrow(
       'Invalid config: stages[2].name "stage-a" is duplicated'
     )

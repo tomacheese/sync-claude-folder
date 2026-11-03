@@ -7,7 +7,7 @@ import { PlanItem, StagePlan } from './planner'
 
 const TIMESTAMP = '20260101T000000'
 
-describe('applyStagePlan のバックアップ', () => {
+describe('applyStagePlan backups', () => {
   let tmpDir: string
   let backupRoot: string
 
@@ -21,9 +21,9 @@ describe('applyStagePlan のバックアップ', () => {
   })
 
   /**
-   * テスト用の StagePlan を組み立てる。
-   * @param name stage 名
-   * @param items プラン項目
+   * Builds a StagePlan for tests.
+   * @param name Stage name
+   * @param items Plan items
    * @returns StagePlan
    */
   function buildPlan(name: string, items: PlanItem[]): StagePlan {
@@ -42,11 +42,11 @@ describe('applyStagePlan のバックアップ', () => {
   }
 
   /**
-   * 通常ファイルの update 項目を組み立てる。
-   * @param name stage 名
-   * @param relPath dest からの相対パス
-   * @param content 書き込む内容
-   * @returns プラン項目
+   * Builds an update item for a regular file.
+   * @param name Stage name
+   * @param relPath Path relative to dest
+   * @param content Content to write
+   * @returns Plan item
    */
   function updateItem(
     name: string,
@@ -64,10 +64,10 @@ describe('applyStagePlan のバックアップ', () => {
   }
 
   /**
-   * dest 側にファイルを作成する。
-   * @param name stage 名
-   * @param relPath dest からの相対パス
-   * @param content ファイルの内容
+   * Creates a file on the dest side.
+   * @param name Stage name
+   * @param relPath Path relative to dest
+   * @param content File content
    */
   async function writeDest(
     name: string,
@@ -89,7 +89,7 @@ describe('applyStagePlan のバックアップ', () => {
     timestamp: TIMESTAMP,
   })
 
-  test('複数 stage が同名 relPath を更新しても stage ごとにバックアップが分離される', async () => {
+  test('backups are separated per stage when multiple stages update the same relPath', async () => {
     await writeDest('stage-a', 'settings.json', 'old-a')
     await writeDest('stage-b', 'settings.json', 'old-b')
 
@@ -118,7 +118,7 @@ describe('applyStagePlan のバックアップ', () => {
     ).toBe('new-b')
   })
 
-  test('delete でも stage ごとにバックアップが分離される', async () => {
+  test('backups are separated per stage on delete as well', async () => {
     await writeDest('stage-a', 'settings.json', 'old-a')
     await writeDest('stage-b', 'settings.json', 'old-b')
     const deleteItem = (name: string): PlanItem => ({
@@ -150,7 +150,7 @@ describe('applyStagePlan のバックアップ', () => {
     ).rejects.toThrow()
   })
 
-  test('dest が symlink の同名 relPath を複数 stage が更新しても stage ごとにリンク先が保存される', async () => {
+  test('link targets are saved per stage when multiple stages update a same-named relPath whose dest is a symlink', async () => {
     for (const name of ['stage-a', 'stage-b']) {
       await fs.mkdir(path.join(tmpDir, name), { recursive: true })
       await fs.symlink(
@@ -187,19 +187,19 @@ describe('applyStagePlan のバックアップ', () => {
     )
   })
 
-  describe('既存のバックアップがある場合は上書きせず中断する', () => {
+  describe('aborts without overwriting when a backup already exists', () => {
     const backupFile = (): string =>
       path.join(backupRoot, TIMESTAMP, 'stage-a', 'settings.json')
 
     /**
-     * 既存バックアップの位置に通常ファイルを置く。
+     * Places a regular file at the existing backup location.
      */
     async function seedBackupFile(): Promise<void> {
       await fs.mkdir(path.dirname(backupFile()), { recursive: true })
       await fs.writeFile(backupFile(), 'existing-backup')
     }
 
-    test('dest が通常ファイルの場合', async () => {
+    test('dest is a regular file', async () => {
       await writeDest('stage-a', 'settings.json', 'old-a')
       await seedBackupFile()
 
@@ -218,7 +218,7 @@ describe('applyStagePlan のバックアップ', () => {
       ).toBe('old-a')
     })
 
-    test('dest がディレクトリの場合', async () => {
+    test('dest is a directory', async () => {
       await writeDest('stage-a', 'settings.json/inner.txt', 'inner')
       await seedBackupFile()
 
@@ -240,7 +240,7 @@ describe('applyStagePlan のバックアップ', () => {
       ).toBe('inner')
     })
 
-    test('dest がディレクトリで既存バックアップが空ディレクトリの場合', async () => {
+    test('dest is a directory and the existing backup is an empty directory', async () => {
       await writeDest('stage-a', 'settings.json/inner.txt', 'inner')
       await fs.mkdir(backupFile(), { recursive: true })
 
@@ -262,7 +262,7 @@ describe('applyStagePlan のバックアップ', () => {
       ).toBe('inner')
     })
 
-    test('dest が symlink の場合', async () => {
+    test('dest is a symlink', async () => {
       await fs.mkdir(path.join(tmpDir, 'stage-a'), { recursive: true })
       await fs.symlink(
         'old-target',
@@ -285,7 +285,7 @@ describe('applyStagePlan のバックアップ', () => {
       ).toBe('old-target')
     })
 
-    test('既存バックアップがリンク切れ symlink の場合', async () => {
+    test('the existing backup is a dangling symlink', async () => {
       await writeDest('stage-a', 'settings.json', 'old-a')
       await fs.mkdir(path.dirname(backupFile()), { recursive: true })
       await fs.symlink('missing-target', backupFile())
@@ -306,7 +306,7 @@ describe('applyStagePlan のバックアップ', () => {
     })
   })
 
-  test('dest が存在しない新規作成ではバックアップを作らない', async () => {
+  test('no backup is created when creating a new file (dest does not exist)', async () => {
     const item: PlanItem = {
       ...updateItem('stage-a', 'settings.json', 'new-a'),
       action: 'create',
@@ -320,7 +320,7 @@ describe('applyStagePlan のバックアップ', () => {
     ).toBe('new-a')
   })
 
-  test('apply が false の場合はバックアップも dest の変更も行わない', async () => {
+  test('neither backup nor dest changes happen when apply is false', async () => {
     await writeDest('stage-a', 'settings.json', 'old-a')
 
     await applyStagePlan(

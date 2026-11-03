@@ -1,68 +1,65 @@
 /**
- * chezmoi のソースファイル名から実名・種別・属性を解決するモジュール。
+ * Resolves chezmoi source file names into real names, entry types and attributes.
  *
- * chezmoi 本体の全属性は対応せず、dot_claude ソースで実際に使用されている
- * サブセット (dot_ / private_ / executable_ / readonly_ / exact_ / literal_ /
- * symlink_ / .tmpl / run_*・create_* 等の実行系プレフィックス) のみを解釈する。
+ * Not every chezmoi attribute is supported; only the subset actually used by the
+ * dot_claude source is interpreted (dot_ / private_ / executable_ / readonly_ /
+ * exact_ / literal_ / symlink_ / .tmpl / script prefixes such as run_* and create_*).
  *
- * 参考: https://www.chezmoi.io/reference/source-state-attributes/
+ * Reference: https://www.chezmoi.io/reference/source-state-attributes/
  */
 
-/** 実体化後のエントリ種別 */
+/** Entry type after materialization. */
 export type ChezmoiEntryType = 'file' | 'dir' | 'symlink'
 
-/** chezmoi 属性のうち、本ツールで扱うもの */
+/** The chezmoi attributes handled by this tool. */
 export interface ChezmoiAttributes {
-  /** private_: パーミッションを所有者のみ読み書き可 (0600) にする */
+  /** private_: owner-only read/write permissions (0600). */
   private: boolean
-  /** readonly_: 読み取り専用にする */
+  /** readonly_: read-only. */
   readonly: boolean
-  /** executable_: 実行ビットを付与する */
+  /** executable_: set the executable bit. */
   executable: boolean
-  /** exact_: ディレクトリ配下を管理ミラーとして扱う (本ツールでは mirror 設定に委譲) */
+  /** exact_: treat the directory contents as a managed mirror (delegated to the `mirror` setting in this tool). */
   exact: boolean
 }
 
-/** ソース名 1 セグメントの解決結果 */
+/** Resolution result for one source-name segment. */
 export interface ResolvedChezmoiName {
-  /** 変換後の実名 (1 セグメント分) */
+  /** Converted real name (one segment). */
   name: string
-  /** エントリ種別 */
+  /** Entry type. */
   type: ChezmoiEntryType
-  /** 解決した属性 */
+  /** Resolved attributes. */
   attrs: ChezmoiAttributes
   /**
-   * 本ツールでは扱わない/扱えない属性 (.tmpl, run_* 等の実行スクリプト系) を
-   * 検出した場合 true。true の場合、呼び出し側はこのエントリを無視する。
+   * True when an attribute this tool does not handle (.tmpl, run_* scripts, etc.) was detected.
+   * Callers must skip such entries.
    */
   ignore: boolean
 }
 
-/** ソース全体パスの解決結果 */
+/** Resolution result for a whole source path. */
 export interface ResolvedChezmoiPath {
-  /** 変換後の実名パス (POSIX 区切り) */
+  /** Converted real-name path (POSIX separators). */
   targetPath: string
-  /** 末端エントリの種別 */
+  /** Type of the last segment's entry. */
   type: ChezmoiEntryType
-  /** 末端エントリの属性 */
+  /** Attributes of the last segment's entry. */
   attrs: ChezmoiAttributes
-  /** パス中のいずれかのセグメントが ignore 対象だった場合 true */
+  /** True if any segment in the path is ignored. */
   ignore: boolean
 }
 
-/**
- * 全属性が false のデフォルト `ChezmoiAttributes` を返す。
- * @returns デフォルト属性オブジェクト
- */
+/** Returns default `ChezmoiAttributes` with every flag false. */
 function defaultAttrs(): ChezmoiAttributes {
   return { private: false, readonly: false, executable: false, exact: false }
 }
 
 /**
- * 本ツールでは解釈せずに ignore とするソース名プレフィックス。
- * run_ , create_ , modify_ , remove_ , onchange_ , encrypted_ , empty_ , external_
- * は対象ファイルに存在しないか、実行スクリプト系のため対象外とする。
- * (run_once_ 等の "*_once_" も run_ 等の前方一致でカバーされる)
+ * Source-name prefixes that are ignored instead of interpreted.
+ * run_, create_, modify_, remove_, onchange_, encrypted_, empty_ and external_
+ * either do not occur in the target files or are script-type entries, so they are out of scope.
+ * (Variants like run_once_ are covered by the run_ prefix match.)
  */
 const IGNORED_PREFIXES = [
   'run_',
@@ -76,34 +73,34 @@ const IGNORED_PREFIXES = [
 ]
 
 /**
- * ソース名 (パスの 1 セグメント) を実名・種別・属性へ解決する。
- * @param sourceName chezmoi ソース上のファイル/ディレクトリ名 (1 セグメント)
- * @returns 解決結果
+ * Resolves a source name (one path segment) into a real name, type and attributes.
+ * @param sourceName File/directory name in the chezmoi source (one segment)
+ * @returns Resolution result
  */
 export function resolveChezmoiName(sourceName: string): ResolvedChezmoiName {
   let name = sourceName
   const attrs = defaultAttrs()
   let type: ChezmoiEntryType = 'file'
 
-  // .tmpl はテンプレートエンジン未対応のため ignore
+  // Templates (.tmpl) are not supported, so ignore
   if (name.endsWith('.tmpl')) {
     return { name, type, attrs, ignore: true }
   }
 
-  // run_*/create_* 等の実行・スクリプト系プレフィックスは ignore
+  // Script-type prefixes such as run_* / create_* are ignored
   for (const prefix of IGNORED_PREFIXES) {
     if (name.startsWith(prefix)) {
       return { name, type, attrs, ignore: true }
     }
   }
 
-  // symlink_ は先頭の型プレフィックスとして解析する
+  // symlink_ is parsed as a leading type prefix
   if (name.startsWith('symlink_')) {
     type = 'symlink'
     name = name.slice('symlink_'.length)
   }
 
-  // literal_ / .literal が出現するまで private_/readonly_/executable_/exact_ を繰り返し解析する
+  // Repeatedly parse private_/readonly_/executable_/exact_ until literal_ / .literal appears
   let literal = false
   let changed = true
   while (changed && !literal) {
@@ -136,7 +133,7 @@ export function resolveChezmoiName(sourceName: string): ResolvedChezmoiName {
     }
   }
 
-  // literal 指定が無い場合のみ dot_ → '.' 変換を行う
+  // Convert dot_ to '.' only when no literal marker was given
   if (!literal && name.startsWith('dot_')) {
     name = '.' + name.slice('dot_'.length)
   }
@@ -145,11 +142,10 @@ export function resolveChezmoiName(sourceName: string): ResolvedChezmoiName {
 }
 
 /**
- * ソース相対パス (POSIX 区切り) を実名パスへ解決する。
- * パス中の各セグメントに {@link resolveChezmoiName} を適用し、
- * いずれかのセグメントが ignore 対象であれば全体を ignore とする。
- * @param relPath ソースディレクトリからの相対パス (POSIX 区切り)
- * @returns 解決結果
+ * Resolves a source-relative path (POSIX separators) into a real-name path.
+ * {@link resolveChezmoiName} is applied to each segment; if any segment is ignored, the whole path is ignored.
+ * @param relPath Path relative to the source directory (POSIX separators)
+ * @returns Resolution result
  */
 export function resolveChezmoiPath(relPath: string): ResolvedChezmoiPath {
   const segments = relPath.split('/')

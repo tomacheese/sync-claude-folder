@@ -5,9 +5,9 @@ import { StageConfig } from './config'
 import { planStage } from './planner'
 
 /**
- * テスト用にファイルを書き込む (親ディレクトリを自動作成する)。
- * @param filePath 書き込み先の絶対パス
- * @param content 書き込む内容
+ * Writes a file for tests (creating parent directories).
+ * @param filePath Absolute path to write to
+ * @param content Content to write
  */
 async function writeFile(filePath: string, content: string): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true })
@@ -52,7 +52,7 @@ describe('planStage', () => {
     }
   }
 
-  test('新規ファイルは create と判定される', async () => {
+  test('a new file is planned as create', async () => {
     await writeFile(
       path.join(sourceDir, 'hooks', 'executable_foo.sh'),
       'echo hi\n'
@@ -61,35 +61,36 @@ describe('planStage', () => {
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'hooks/foo.sh')
 
-    expect(item, 'hooks/foo.sh の項目が存在すること').toBeDefined()
-    expect(item?.action, '新規ファイルは create であること').toBe('create')
-    expect(item?.attrs?.executable, 'executable_ 属性が解決されること').toBe(
-      true
-    )
+    expect(item, 'an item for hooks/foo.sh exists').toBeDefined()
+    expect(item?.action, 'a new file is create').toBe('create')
+    expect(
+      item?.attrs?.executable,
+      'the executable_ attribute is resolved'
+    ).toBe(true)
     expect(item?.content?.toString()).toBe('echo hi\n')
   })
 
-  test('内容が一致するファイルは skip と判定される', async () => {
+  test('a file with identical content is planned as skip', async () => {
     await writeFile(path.join(sourceDir, 'hooks', 'bar.sh'), 'echo bar\n')
     await writeFile(path.join(destDir, 'hooks', 'bar.sh'), 'echo bar\n')
 
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'hooks/bar.sh')
 
-    expect(item?.action, '内容が一致する場合は skip であること').toBe('skip')
+    expect(item?.action, 'identical content is skip').toBe('skip')
   })
 
-  test('内容が異なるファイルは update と判定される', async () => {
+  test('a file with different content is planned as update', async () => {
     await writeFile(path.join(sourceDir, 'hooks', 'bar.sh'), 'echo new\n')
     await writeFile(path.join(destDir, 'hooks', 'bar.sh'), 'echo old\n')
 
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'hooks/bar.sh')
 
-    expect(item?.action, '内容が異なる場合は update であること').toBe('update')
+    expect(item?.action, 'different content is update').toBe('update')
   })
 
-  test('transform 適用後の内容で比較・生成される', async () => {
+  test('comparison and generation use the content after transforms', async () => {
     await writeFile(
       path.join(sourceDir, 'private_settings.json'),
       JSON.stringify({ hooks: { Stop: [] }, theme: 'light' })
@@ -98,32 +99,36 @@ describe('planStage', () => {
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'settings.json')
 
-    expect(item?.action, 'dest に無いため create であること').toBe('create')
-    expect(item?.attrs?.private, 'private_ 属性が解決されること').toBe(true)
+    expect(item?.action, 'create because it is missing from dest').toBe(
+      'create'
+    )
+    expect(item?.attrs?.private, 'the private_ attribute is resolved').toBe(
+      true
+    )
     expect(
       JSON.parse(item?.content?.toString() ?? '{}'),
-      'hooks が remove されていること'
+      'hooks is removed'
     ).toEqual({
       theme: 'light',
     })
   })
 
-  test('mirror: managed 範囲内でソースに無い実名ファイルは delete と判定される', async () => {
+  test('mirror: a real-name file within managed that is not in the source is planned as delete', async () => {
     await writeFile(path.join(destDir, 'hooks', 'old.sh'), 'echo old\n')
 
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'hooks/old.sh')
 
-    expect(item?.action, 'mirror により delete と判定されること').toBe('delete')
+    expect(item?.action, 'delete because of mirror').toBe('delete')
   })
 
-  test('protected はソースに有無を問わず create/update/delete から除外される', async () => {
-    // dest にのみ存在する protected ファイル -> mirror 対象でも削除されない
+  test('protected is excluded from create/update/delete whether or not it exists in the source', async () => {
+    // A protected file only in dest is not deleted even though mirror applies
     await writeFile(
       path.join(destDir, 'hooks', 'protected.sh'),
       'echo protected\n'
     )
-    // source にも同名ファイルがあるが、protected のため create/update もされない
+    // A same-named file also exists in source, but protected prevents create/update
     await writeFile(
       path.join(sourceDir, 'hooks', 'protected.sh'),
       'echo from source\n'
@@ -132,22 +137,19 @@ describe('planStage', () => {
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'hooks/protected.sh')
 
-    expect(item, 'protected ファイルはプランに含まれないこと').toBeUndefined()
+    expect(item, 'protected files are not in the plan').toBeUndefined()
   })
 
-  test('managed に一致しない実名ファイルは削除されない', async () => {
+  test('real-name files not matching managed are not deleted', async () => {
     await writeFile(path.join(destDir, 'unmanaged.txt'), 'keep me\n')
 
     const plan = await planStage(buildStage())
     const item = plan.items.find((i) => i.relPath === 'unmanaged.txt')
 
-    expect(
-      item,
-      'managed 範囲外のファイルはプランに含まれないこと'
-    ).toBeUndefined()
+    expect(item, 'files outside managed are not in the plan').toBeUndefined()
   })
 
-  test('mirror: false のとき dest にのみ存在するファイルは削除されない', async () => {
+  test('with mirror: false, files only in dest are not deleted', async () => {
     await writeFile(path.join(destDir, 'hooks', 'old.sh'), 'echo old\n')
 
     const plan = await planStage(buildStage({ mirror: false }))
@@ -155,11 +157,11 @@ describe('planStage', () => {
 
     expect(
       item,
-      'mirror: false のとき managed 範囲内でも余剰ファイルは削除されないこと'
+      'with mirror: false, extra files are not deleted even within managed'
     ).toBeUndefined()
   })
 
-  test('ignore に一致するソースファイルは対象外になる', async () => {
+  test('source files matching ignore are excluded', async () => {
     await writeFile(
       path.join(sourceDir, 'hooks', 'executable_foo.sh'),
       'echo hi\n'

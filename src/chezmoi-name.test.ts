@@ -1,9 +1,9 @@
 import { resolveChezmoiName, resolveChezmoiPath } from './chezmoi-name'
 
 describe('resolveChezmoiName', () => {
-  test('executable_ プレフィックスは除去され、実行属性が付与される', () => {
+  test('executable_ prefix is stripped and the executable attribute is set', () => {
     const result = resolveChezmoiName('executable_statusline.sh')
-    expect(result, 'name は executable_ が除去された名前であること').toEqual({
+    expect(result, 'name has executable_ stripped').toEqual({
       name: 'statusline.sh',
       type: 'file',
       attrs: {
@@ -16,9 +16,9 @@ describe('resolveChezmoiName', () => {
     })
   })
 
-  test('readonly_dot_ は readonly 属性と dot_ 変換が両方適用される', () => {
+  test('readonly_dot_ applies both the readonly attribute and the dot_ conversion', () => {
     const result = resolveChezmoiName('readonly_dot_rtk-hook.sha256')
-    expect(result, 'readonly かつ dot_ 変換が適用されること').toEqual({
+    expect(result, 'readonly and dot_ conversion are both applied').toEqual({
       name: '.rtk-hook.sha256',
       type: 'file',
       attrs: {
@@ -31,9 +31,12 @@ describe('resolveChezmoiName', () => {
     })
   })
 
-  test('private_ プレフィックスは除去され、private 属性が付与される', () => {
+  test('private_ prefix is stripped and the private attribute is set', () => {
     const result = resolveChezmoiName('private_settings.json')
-    expect(result, 'private_ が除去され private 属性が付与されること').toEqual({
+    expect(
+      result,
+      'private_ is stripped and the private attribute is set'
+    ).toEqual({
       name: 'settings.json',
       type: 'file',
       attrs: {
@@ -46,15 +49,15 @@ describe('resolveChezmoiName', () => {
     })
   })
 
-  test('dot_ プレフィックスは . に変換される', () => {
+  test('dot_ prefix is converted to .', () => {
     const result = resolveChezmoiName('dot_env')
-    expect(result.name, 'dot_ が . に変換されること').toBe('.env')
-    expect(result.ignore, '通常ファイルは ignore されないこと').toBe(false)
+    expect(result.name, 'dot_ is converted to .').toBe('.env')
+    expect(result.ignore, 'regular files are not ignored').toBe(false)
   })
 
-  test('プレフィックスの無い通常名はそのまま返る', () => {
+  test('a plain name without prefixes is returned unchanged', () => {
     const result = resolveChezmoiName('CLAUDE.md')
-    expect(result, '通常名はそのまま返ること').toEqual({
+    expect(result, 'a plain name is returned unchanged').toEqual({
       name: 'CLAUDE.md',
       type: 'file',
       attrs: {
@@ -67,58 +70,58 @@ describe('resolveChezmoiName', () => {
     })
   })
 
-  test('symlink_literal_executable_ は symlink 型で literal 部分が実名になる', () => {
+  test('symlink_literal_executable_ yields a symlink whose literal part becomes the real name', () => {
     const result = resolveChezmoiName('symlink_literal_executable_foo.sh')
-    expect(result.type, 'symlink_ により symlink 型になること').toBe('symlink')
+    expect(result.type, 'symlink_ makes the type symlink').toBe('symlink')
     expect(
       result.name,
-      'literal_ 以降は dot_ 変換等を行わず literal 名になること'
+      'after literal_ no dot_ conversion etc. is applied and the name stays literal'
     ).toBe('executable_foo.sh')
     expect(
       result.ignore,
-      'chezmoi-name 単体では ignore とせず、config の ignore glob に委ねること'
+      'chezmoi-name alone does not ignore it; that is left to the config ignore globs'
     ).toBe(false)
   })
 
-  test('.tmpl で終わる名前は ignore される', () => {
+  test('names ending in .tmpl are ignored', () => {
     const result = resolveChezmoiName(
       'run_onchange_after_clear-plugin-cache.sh.tmpl'
     )
-    expect(result.ignore, '.tmpl は非対応のため ignore されること').toBe(true)
+    expect(result.ignore, '.tmpl is unsupported, so it is ignored').toBe(true)
   })
 
-  test('run_once_ プレフィックスは ignore される', () => {
+  test('run_once_ prefix is ignored', () => {
     const result = resolveChezmoiName('run_once_before_test.sh')
-    expect(result.ignore, 'run_ プレフィックスは ignore されること').toBe(true)
+    expect(result.ignore, 'run_ prefix is ignored').toBe(true)
   })
 })
 
 describe('resolveChezmoiPath', () => {
-  test('ディレクトリを含むパス全体に dot_ 変換が適用される', () => {
+  test('dot_ conversion is applied across a whole path with directories', () => {
     const result = resolveChezmoiPath('scripts/completion-notify/dot_env')
-    expect(result.targetPath, '各セグメントが変換されて結合されること').toBe(
+    expect(result.targetPath, 'each segment is converted and joined').toBe(
       'scripts/completion-notify/.env'
     )
     expect(result.type).toBe('file')
     expect(result.ignore).toBe(false)
   })
 
-  test('readonly_dot_ を含むパスは末端の属性が反映される', () => {
+  test('a path containing readonly_dot_ reflects the last segment attributes', () => {
     const result = resolveChezmoiPath('hooks/readonly_dot_rtk-hook.sha256')
     expect(result.targetPath).toBe('hooks/.rtk-hook.sha256')
     expect(
       result.attrs.readonly,
-      '末端セグメントの readonly 属性が反映されること'
+      'the readonly attribute of the last segment is reflected'
     ).toBe(true)
   })
 
-  test('.tmpl を含むパスは全体が ignore される', () => {
+  test('a path containing .tmpl is ignored as a whole', () => {
     const result = resolveChezmoiPath(
       '.chezmoiscripts/run_onchange_after_clear-plugin-cache.sh.tmpl'
     )
     expect(
       result.ignore,
-      '.tmpl セグメントを含む場合は全体が ignore されること'
+      'the whole path is ignored when it contains a .tmpl segment'
     ).toBe(true)
   })
 })
