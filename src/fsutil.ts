@@ -1,17 +1,13 @@
 /**
- * ファイルシステム関連の小さなユーティリティ群。
- * glob 判定・パス展開・再帰走査をゼロ依存で実装する。
+ * Small filesystem utilities.
+ * Glob matching, path expansion and recursive traversal, implemented without dependencies.
  */
 
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import path from 'node:path'
 
-/**
- * パス先頭の `~` をホームディレクトリへ展開する。
- * @param targetPath 展開対象のパス
- * @returns 展開後の絶対/相対パス
- */
+/** Expands a leading `~` to the home directory. */
 export function expandHome(targetPath: string): string {
   if (targetPath === '~') {
     return os.homedir()
@@ -21,29 +17,22 @@ export function expandHome(targetPath: string): string {
     : targetPath
 }
 
-/**
- * OS のパス区切りを POSIX (`/`) に統一する。
- * @param targetPath 変換対象のパス
- * @returns POSIX 区切りのパス
- */
+/** Normalizes OS path separators to POSIX (`/`). */
 export function toPosixPath(targetPath: string): string {
   return targetPath.split(path.sep).join('/')
 }
 
 /**
- * 指定ディレクトリ以下を再帰的に走査し、ファイル・シンボリックリンクの
- * 相対パス (POSIX 区切り) 一覧を返す。ディレクトリ自体は結果に含めない。
- * ルートディレクトリが存在しない場合は空配列を返す。
- * @param root 走査対象のディレクトリ (絶対パス)
- * @returns ルートからの相対パス (POSIX 区切り) の一覧
+ * Recursively walks a directory and returns the relative paths (POSIX separators)
+ * of files and symlinks. Directories themselves are not included.
+ * Returns an empty array if the root does not exist.
+ * @param root Directory to walk (absolute path)
+ * @returns Paths relative to the root (POSIX separators)
  */
 export async function walkFiles(root: string): Promise<string[]> {
   const result: string[] = []
 
-  /**
-   * 指定ディレクトリを再帰的に走査して `result` へ追加する内部ヘルパー。
-   * @param dir 走査対象ディレクトリの絶対パス
-   */
+  /** Recursively walks `dir`, appending to `result`. */
   async function walk(dir: string): Promise<void> {
     let entries: import('node:fs').Dirent[]
     try {
@@ -61,7 +50,7 @@ export async function walkFiles(root: string): Promise<string[]> {
         await walk(absolutePath)
         continue
       }
-      // ファイル・シンボリックリンクは走査結果に含める
+      // Files and symlinks are included in the result
       result.push(toPosixPath(path.relative(root, absolutePath)))
     }
   }
@@ -70,16 +59,16 @@ export async function walkFiles(root: string): Promise<string[]> {
   return result
 }
 
-/** glob パターン文字列 → 正規表現のキャッシュ */
+/** Cache from glob pattern string to RegExp. */
 const globRegExpCache = new Map<string, RegExp>()
 
 /**
- * glob パターン (`*` / `**` / `?` に対応) を正規表現へ変換する。
- * 変換結果はモジュールレベルでキャッシュされ、同一パターンの再コンパイルを避ける。
- * `**` はパス区切りを含めて任意長にマッチし、`**\/` は 0 階層も許容する。
- * `*` はパス区切りを含まない任意長、`?` は任意の 1 文字 (パス区切り以外) にマッチする。
- * @param pattern glob パターン
- * @returns 変換後の正規表現 (完全一致)
+ * Converts a glob pattern (supporting `*`, `**` and `?`) to a RegExp.
+ * Results are cached at module level to avoid recompiling the same pattern.
+ * `**` matches any length including path separators, and `**\/` also allows zero directory levels.
+ * `*` matches any length excluding path separators; `?` matches one character other than a path separator.
+ * @param pattern Glob pattern
+ * @returns Anchored (full-match) regular expression
  */
 export function globToRegExp(pattern: string): RegExp {
   const cached = globRegExpCache.get(pattern)
@@ -92,16 +81,16 @@ export function globToRegExp(pattern: string): RegExp {
     if (char === '*') {
       if (pattern[i + 1] === '*') {
         if (pattern[i + 2] === '/') {
-          // `**/` -> 0 階層以上のディレクトリにマッチ
+          // `**/` matches zero or more directory levels
           regExpSource += '(?:.*/)?'
           i += 2
         } else {
-          // `**` -> パス区切りを含む任意長
+          // `**` matches any length, including path separators
           regExpSource += '.*'
           i += 1
         }
       } else {
-        // `*` -> パス区切りを含まない任意長
+        // `*` matches any length, excluding path separators
         regExpSource += '[^/]*'
       }
     } else if (char === '?') {
@@ -117,22 +106,12 @@ export function globToRegExp(pattern: string): RegExp {
   return regexp
 }
 
-/**
- * パスが glob パターンに一致するか判定する。
- * @param pattern glob パターン
- * @param targetPath 判定対象のパス (POSIX 区切り)
- * @returns 一致する場合 true
- */
+/** Returns true if the path (POSIX separators) matches the glob pattern. */
 export function matchGlob(pattern: string, targetPath: string): boolean {
   return globToRegExp(pattern).test(targetPath)
 }
 
-/**
- * パスがいずれかの glob パターンに一致するか判定する。
- * @param patterns glob パターンの配列
- * @param targetPath 判定対象のパス (POSIX 区切り)
- * @returns いずれかに一致する場合 true
- */
+/** Returns true if the path (POSIX separators) matches any of the glob patterns. */
 export function matchAnyGlob(patterns: string[], targetPath: string): boolean {
   return patterns.some((pattern) => matchGlob(pattern, targetPath))
 }

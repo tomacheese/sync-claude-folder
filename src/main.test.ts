@@ -10,33 +10,33 @@ jest.mock('./apply', () => ({
 }))
 
 describe('stripDoubleDashSeparator', () => {
-  test('pnpm 経由で転送される先頭の孤立した -- を取り除く', () => {
+  test('removes the stray leading -- forwarded via pnpm', () => {
     expect(stripDoubleDashSeparator(['sync', '--', '--apply'])).toEqual([
       'sync',
       '--apply',
     ])
   })
 
-  test('-- が存在しない場合は変化しない', () => {
+  test('is unchanged when there is no --', () => {
     expect(stripDoubleDashSeparator(['sync', '--apply'])).toEqual([
       'sync',
       '--apply',
     ])
   })
 
-  test('2 個目以降の -- は取り除かず、通常の終端記号として残す', () => {
+  test('keeps the second and later -- as ordinary terminators', () => {
     expect(
       stripDoubleDashSeparator(['sync', '--', '--apply', '--', '--stage'])
     ).toEqual(['sync', '--apply', '--', '--stage'])
   })
 
-  test('値そのものに -- を含むオプション値は変化しない', () => {
+  test('an option value containing -- is unchanged', () => {
     expect(
       stripDoubleDashSeparator(['sync', '--config', './--weird.json'])
     ).toEqual(['sync', '--config', './--weird.json'])
   })
 
-  test('先頭の -- を取り除いた後、オプション値として literal な -- は保持する', () => {
+  test('after removing the leading --, a literal -- option value is preserved', () => {
     expect(stripDoubleDashSeparator(['sync', '--', '--config', '--'])).toEqual([
       'sync',
       '--config',
@@ -45,7 +45,7 @@ describe('stripDoubleDashSeparator', () => {
   })
 })
 
-describe('runSync のバックアップ', () => {
+describe('runSync backups', () => {
   let tmpDir: string
 
   beforeEach(async () => {
@@ -64,7 +64,7 @@ describe('runSync のバックアップ', () => {
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  test('複数 stage が同名ファイルを更新しても 1 つの実行 ID 配下に stage ごとのバックアップが残る', async () => {
+  test('per-stage backups are kept under a single run ID when multiple stages update the same file', async () => {
     const source = path.join(tmpDir, 'source')
     await fs.mkdir(source)
     await fs.writeFile(path.join(source, 'settings.json'), 'new')

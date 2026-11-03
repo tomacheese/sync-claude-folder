@@ -1,5 +1,5 @@
 /**
- * 同期ステージごとに create/update/delete/skip のプランを算出するモジュール。
+ * Computes the create/update/delete/skip plan for each sync stage.
  */
 
 import * as fs from 'node:fs/promises'
@@ -9,38 +9,38 @@ import { StageConfig } from './config'
 import { expandHome, matchAnyGlob, walkFiles } from './fsutil'
 import { applyJsonTransform } from './transforms'
 
-/** プラン上のアクション種別 */
+/** Action kind in a plan. */
 export type PlanAction = 'create' | 'update' | 'delete' | 'skip'
 
-/** プラン 1 件分の情報 */
+/** One plan item. */
 export interface PlanItem {
-  /** dest からの相対パス (実名・POSIX 区切り) */
+  /** Path relative to dest (real name, POSIX separators). */
   relPath: string
-  /** 実行するアクション */
+  /** Action to perform. */
   action: PlanAction
-  /** エントリ種別 (delete の場合は dest 側の実態に依らず 'file' とする) */
+  /** Entry type (for delete, always 'file' regardless of what is actually in dest). */
   type: 'file' | 'symlink'
-  /** コピー元の絶対パス (create/update のみ) */
+  /** Absolute source path (create/update only). */
   sourcePath?: string
-  /** コピー先の絶対パス */
+  /** Absolute destination path. */
   destPath: string
-  /** 書き込む内容 (transform 適用後。type が 'file' の create/update のみ) */
+  /** Content to write (after transforms; only for create/update with type 'file'). */
   content?: Buffer
-  /** symlink のリンク先 (type が 'symlink' の create/update のみ) */
+  /** Symlink target (only for create/update with type 'symlink'). */
   symlinkTarget?: string
-  /** chezmoi 属性 (create/update のみ) */
+  /** chezmoi attributes (create/update only). */
   attrs?: ChezmoiAttributes
-  /** アクションを選択した理由 (ログ表示用) */
+  /** Why the action was chosen (for log output). */
   reason: string
 }
 
-/** ステージ 1 件分のプラン */
+/** Plan of one stage. */
 export interface StagePlan {
   stage: StageConfig
   items: PlanItem[]
 }
 
-/** 期待される (ソース側から算出した) エントリ情報 */
+/** Expected entry, computed from the source side. */
 interface ExpectedEntry {
   content?: Buffer
   symlinkTarget?: string
@@ -50,11 +50,11 @@ interface ExpectedEntry {
 }
 
 /**
- * ソースディレクトリを走査し、ステージの managed/ignore/transforms を適用した
- * 「期待される実名エントリ集合」を算出する。
- * @param stage ステージ設定
- * @param sourceDir 展開済みのソースディレクトリ絶対パス
- * @returns 実名相対パス (POSIX) → 期待エントリ のマップ
+ * Walks the source directory and computes the set of expected real-name entries,
+ * applying the stage's managed/ignore/transforms.
+ * @param stage Stage config
+ * @param sourceDir Absolute path of the already-expanded source directory
+ * @returns Map from real-name relative path (POSIX) to expected entry
  */
 async function buildExpectedEntries(
   stage: StageConfig,
@@ -64,7 +64,7 @@ async function buildExpectedEntries(
   const sourceFiles = await walkFiles(sourceDir)
 
   for (const relPath of sourceFiles) {
-    // ソース名に対する ignore 判定 (chezmoi 命名変換前)
+    // ignore is matched against the source name (before chezmoi naming conversion)
     if (matchAnyGlob(stage.ignore, relPath)) {
       continue
     }
@@ -87,7 +87,7 @@ async function buildExpectedEntries(
       type = resolved.type === 'symlink' ? 'symlink' : 'file'
       attrs = resolved.attrs
     } else {
-      // chezmoiNaming: false の場合も lstat でシンボリックリンクを検出する
+      // Detect symlinks via lstat even when chezmoiNaming is false
       const absSrc = path.join(sourceDir, ...relPath.split('/'))
       const srcStat = await fs.lstat(absSrc)
       if (srcStat.isSymbolicLink()) {
@@ -95,7 +95,7 @@ async function buildExpectedEntries(
       }
     }
 
-    // 変換後の実名に対する managed 判定
+    // managed is matched against the converted real name
     if (!matchAnyGlob(stage.managed, targetRel)) {
       continue
     }
@@ -134,10 +134,10 @@ async function buildExpectedEntries(
 }
 
 /**
- * dest 側の既存エントリと期待エントリを比較し、アクションと理由を決定する。
- * @param destPath dest 側の絶対パス
- * @param expected 期待エントリ
- * @returns アクションと理由
+ * Compares the existing dest entry with the expected entry and decides the action and reason.
+ * @param destPath Absolute path on the dest side
+ * @param expected Expected entry
+ * @returns Action and reason
  */
 async function decideAction(
   destPath: string,
@@ -151,36 +151,39 @@ async function decideAction(
   })
 
   if (!destStat) {
-    return { action: 'create', reason: 'dest に存在しない' }
+    return { action: 'create', reason: 'not present in dest' }
   }
 
   if (expected.type === 'symlink') {
     if (!destStat.isSymbolicLink()) {
-      return { action: 'update', reason: 'dest が symlink ではない' }
+      return { action: 'update', reason: 'dest is not a symlink' }
     }
     const currentTarget = await fs.readlink(destPath)
     return currentTarget === expected.symlinkTarget
-      ? { action: 'skip', reason: '差分なし' }
-      : { action: 'update', reason: 'symlink の参照先が異なる' }
+      ? { action: 'skip', reason: 'no difference' }
+      : { action: 'update', reason: 'symlink target differs' }
   }
 
   if (destStat.isDirectory()) {
-    return { action: 'update', reason: 'dest が同名のディレクトリになっている' }
+    return {
+      action: 'update',
+      reason: 'dest is a directory with the same name',
+    }
   }
   if (destStat.isSymbolicLink()) {
-    return { action: 'update', reason: 'dest が symlink になっている' }
+    return { action: 'update', reason: 'dest is a symlink' }
   }
 
   const currentContent = await fs.readFile(destPath)
   return currentContent.equals(expected.content ?? Buffer.alloc(0))
-    ? { action: 'skip', reason: '差分なし' }
-    : { action: 'update', reason: '内容が異なる' }
+    ? { action: 'skip', reason: 'no difference' }
+    : { action: 'update', reason: 'content differs' }
 }
 
 /**
- * 1 ステージ分の同期プラン (create/update/delete/skip) を算出する。
- * @param stage ステージ設定 (`~` は未展開でよい)
- * @returns ステージとプラン項目一覧
+ * Computes the sync plan (create/update/delete/skip) for one stage.
+ * @param stage Stage config (`~` may be unexpanded)
+ * @returns The stage and its plan items
  */
 export async function planStage(stage: StageConfig): Promise<StagePlan> {
   const sourceDir = expandHome(stage.source)
@@ -190,7 +193,7 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
   const expected = await buildExpectedEntries(stage, sourceDir)
 
   for (const [targetRel, entry] of expected) {
-    // protected は create/update からも常に除外する
+    // protected is always excluded from create/update too
     if (matchAnyGlob(stage.protected, targetRel)) {
       continue
     }
@@ -214,15 +217,15 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
   if (stage.mirror) {
     const destFiles = await walkFiles(destDir)
     for (const relPath of destFiles) {
-      // protected は削除対象から常に除外する (最優先ガード)
+      // protected is always excluded from deletion (highest-priority guard)
       if (matchAnyGlob(stage.protected, relPath)) {
         continue
       }
-      // managed 範囲外の実名ファイルは管理しない (削除しない)
+      // Files outside managed are not managed (never deleted)
       if (!matchAnyGlob(stage.managed, relPath)) {
         continue
       }
-      // 期待集合に含まれていれば create/update 側で処理済み
+      // Already handled as create/update if in the expected set
       if (expected.has(relPath)) {
         continue
       }
@@ -232,7 +235,7 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
         action: 'delete',
         type: 'file',
         destPath: path.join(destDir, ...relPath.split('/')),
-        reason: 'ソースに存在しない managed ファイル (mirror 削除)',
+        reason: 'managed file not present in source (mirror delete)',
       })
     }
   }

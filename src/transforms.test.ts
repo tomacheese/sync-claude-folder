@@ -7,51 +7,51 @@ import {
 } from './transforms'
 
 describe('getByPointer', () => {
-  test('ネストしたパスの値を取得できる', () => {
+  test('gets a value at a nested path', () => {
     const obj = { hooks: { Stop: [{ matcher: '' }] } }
     expect(getByPointer(obj, '/hooks/Stop/0/matcher')).toBe('')
   })
 
-  test('存在しないパスは undefined を返す', () => {
+  test('returns undefined for a missing path', () => {
     const obj = { hooks: {} }
     expect(getByPointer(obj, '/hooks/Stop')).toBeUndefined()
   })
 })
 
 describe('removeByPointer', () => {
-  test('指定したキーを削除する', () => {
+  test('removes the given key', () => {
     const obj: Record<string, unknown> = { hooks: { Stop: [] }, theme: 'dark' }
     removeByPointer(obj, '/hooks')
-    expect(obj, 'hooks キーが削除され theme は残ること').toEqual({
+    expect(obj, 'the hooks key is removed and theme remains').toEqual({
       theme: 'dark',
     })
   })
 
-  test('親パスが存在しない場合は何もしない', () => {
+  test('does nothing when the parent path is missing', () => {
     const obj: Record<string, unknown> = { theme: 'dark' }
     removeByPointer(obj, '/hooks/Stop')
-    expect(obj, '何も変化しないこと').toEqual({ theme: 'dark' })
+    expect(obj, 'nothing changes').toEqual({ theme: 'dark' })
   })
 })
 
 describe('setByPointer', () => {
-  test('既存オブジェクトに値を設定する', () => {
+  test('sets a value on an existing object', () => {
     const obj: Record<string, unknown> = { theme: 'light' }
     setByPointer(obj, '/theme', 'dark-daltonized')
     expect(obj.theme).toBe('dark-daltonized')
   })
 
-  test('中間オブジェクトが存在しない場合は新規作成する', () => {
+  test('creates missing intermediate objects', () => {
     const obj: Record<string, unknown> = {}
     setByPointer(obj, '/a/b/c', 1)
-    expect(obj, '中間オブジェクトが自動生成されること').toEqual({
+    expect(obj, 'intermediate objects are created automatically').toEqual({
       a: { b: { c: 1 } },
     })
   })
 })
 
 describe('deepMerge', () => {
-  test('オブジェクトは再帰的にマージされる', () => {
+  test('objects are merged recursively', () => {
     const target = { a: { x: 1, y: 2 }, b: 1 }
     const source = { a: { y: 3, z: 4 }, c: 5 }
     expect(deepMerge(target, source)).toEqual({
@@ -61,23 +61,23 @@ describe('deepMerge', () => {
     })
   })
 
-  test('配列は再帰せず source の値で上書きされる', () => {
+  test('arrays are not recursed into and are overwritten by the source value', () => {
     const target = { list: [1, 2] }
     const source = { list: [3] }
     expect(deepMerge(target, source)).toEqual({ list: [3] })
   })
 
-  test('target は変更されない (非破壊)', () => {
+  test('target is not modified (non-destructive)', () => {
     const target = { a: { x: 1 } }
     deepMerge(target, { a: { y: 2 } })
-    expect(target, '元のオブジェクトは変更されないこと').toEqual({
+    expect(target, 'the original object is not modified').toEqual({
       a: { x: 1 },
     })
   })
 })
 
 describe('applyJsonTransform', () => {
-  test('remove → set → merge の順に適用される', () => {
+  test('applies remove -> set -> merge in order', () => {
     const content = JSON.stringify({
       hooks: { Stop: [] },
       theme: 'light',
@@ -95,7 +95,7 @@ describe('applyJsonTransform', () => {
     })
   })
 
-  test('2 スペースインデント + 末尾改行で整形される', () => {
+  test('formats with 2-space indent and a trailing newline', () => {
     const result = applyJsonTransform('{"a":1}', [])
     expect(result).toBe('{\n  "a": 1\n}\n')
   })

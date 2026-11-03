@@ -1,63 +1,35 @@
 # Copilot Code Review Instructions
 
-Guidance for GitHub Copilot when reviewing pull requests in this repository.
-This file is for code review, not for driving development (see `CLAUDE.md` for that).
-
-## What this project is
-
-A CLI tool that syncs a chezmoi source tree (`dot_claude`) into `~/.claude` and
-`~/.claude-work`, applying a subset of chezmoi naming conversion and JSON Pointer
-transforms. It operates on live user directories that hold auth credentials and
-session history, so file-mutating code is safety-critical.
+Guidance for GitHub Copilot when reviewing pull requests in this repository. Project overview, commands, safety rules and conventions are in [`AGENTS.md`](../AGENTS.md); this file lists only what to check during review. All review comments and suggested text should be in English.
 
 ## Review focus
 
-### Safety of destructive operations (highest priority)
+### Destructive operations (highest priority)
 
-- `src/apply.ts` must never write, delete, or `chmod` when `options.apply` is
-  `false`. Flag any create/update/delete path that is not guarded by an
-  `if (!options.apply) return` (dry-run is the default).
-- Overwrites and deletes must back up the existing dest entry first
-  (`backupExisting`) before `fs.rm` / `fs.writeFile`. Flag any mutation that
-  skips the backup step.
-- `protected` globs must always be excluded from create/update/delete. Flag
-  changes to `src/planner.ts` that could let a protected path be mutated.
-- `mirror` deletion must stay scoped to `managed` globs. Flag deletions that
-  could escape the managed set.
+- `src/apply.ts` must never write, delete, or `chmod` when `options.apply` is `false`. Flag any create/update/delete path not guarded by `if (!options.apply) return`.
+- Overwrites and deletes must call `backupExisting` before `fs.rm` / `fs.writeFile`. Flag any mutation that skips the backup.
+- `protected` globs must stay excluded from create/update/delete. Flag `src/planner.ts` changes that could let a protected path be mutated, and any change to the protected list or its handling (`config.example.json`, `config.schema.json`, `src/planner.ts`) that is not explained as maintainer-approved in the PR.
+- `mirror` deletion must stay scoped to `managed` globs.
 
 ### Error handling
 
-- Throw `Error` / `TypeError` with a clear message on invalid config or missing
-  required fields (see `src/config.ts`); do not silently swallow or return
-  defaults for malformed input.
-- Best-effort operations that are expected to fail on some platforms (e.g.
-  `chmod` on Windows in `applyAttrs`) should warn and continue, not throw.
-- Distinguish `ENOENT` (expected: file absent) from other filesystem errors;
-  do not treat all errors as "missing".
+- Invalid config or missing required fields must throw `Error` / `TypeError` with a clear message (see `src/config.ts`); do not return defaults for malformed input.
+- Best-effort steps that may fail on some platforms (e.g. `chmod` in `applyAttrs`) warn and continue.
+- Distinguish `ENOENT` from other filesystem errors.
 
-### Conventions enforced in this repo
+### Conventions
 
-- Error/warning message text is English. Code comments and JSDoc are Japanese.
-  Flag mismatches.
-- Every function, interface, and class needs Japanese JSDoc. Flag new exported
-  symbols that lack it.
-- Do not introduce `skipLibCheck` or other type-error suppression to work around
-  `tsc` failures.
-- Prefer `node:` prefixed imports for built-in modules, consistent with existing
-  code (`node:fs`, `node:path`).
+- Error/warning messages, code comments and JSDoc are English. Flag Japanese text introduced into them.
+- New functions, interfaces and classes need JSDoc; flag restate-the-code comments.
+- No `skipLibCheck` or other type-error suppression.
+- Use `node:`-prefixed imports for built-in modules.
 
 ### Tests
 
-- New chezmoi attributes, transform operations, or planner branches must come
-  with tests (`*.test.ts` adjacent to the source).
-- `protected` / `mirror` boundary behavior (not deleted, not overwritten) must
-  remain covered. Flag changes to that logic that lack corresponding tests.
+- New chezmoi attributes, transform operations or planner branches need tests.
+- `protected` / `mirror` boundary behavior must remain covered.
 
 ## Do not flag
 
-- Japanese text in comments, JSDoc, or the conversation-facing docs — it is the
-  intended language for this repo.
-- The dual `~/.claude` and `~/.claude-work` destinations — sinking to two targets
-  is by design, not duplication.
-- `pnpm`-only enforcement (`preinstall` runs `only-allow pnpm`); suggestions to
-  support npm/yarn are out of scope.
+- The dual `~/.claude` and `~/.claude-work` destinations; they are by design.
+- pnpm-only enforcement (`only-allow pnpm`); suggestions to support npm/yarn are out of scope.

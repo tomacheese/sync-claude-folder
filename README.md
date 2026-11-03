@@ -1,16 +1,12 @@
 # sync-claude-folder
 
-A CLI tool that syncs the `dot_claude` source in a dotfiles repository to `~/.claude`
-and `~/.claude-work`, following chezmoi-like naming conversion rules.
+A CLI tool that syncs the `dot_claude` source in a dotfiles repository to `~/.claude` and `~/.claude-work`, following chezmoi-like naming conversion rules.
 
 ## Background
 
 - Materializes `~/repos/dotfiles/home/dot_claude` (chezmoi source) into `~/.claude`.
-- Also syncs the same content to `~/.claude-work` (used with a separate account),
-  while protecting auth/runtime data.
-- Does not use chezmoi itself — this tool performs chezmoi naming conversion
-  (`dot_`/`private_`/`executable_`/`readonly_` subset) and JSON transforms
-  (`remove`/`set`/`merge`).
+- Also syncs the same content to `~/.claude-work` (used with a separate account), while protecting auth/runtime data.
+- Does not use chezmoi itself; this tool performs chezmoi naming conversion (a subset: `dot_`, `private_`, `executable_`, `readonly_`, `exact_`, `literal_`, `symlink_`) and JSON transforms (`remove`/`set`/`merge`).
 
 ## Setup
 
@@ -24,8 +20,7 @@ pnpm install
 
 ### sync
 
-Calculates a sync plan (create/update/delete/skip) for each stage defined in `config.json`.
-Defaults to dry-run (plan display only); files are written only when `--apply` is specified.
+Calculates a sync plan (create/update/delete/skip) for each stage defined in `config.json`. Defaults to dry-run (plan display only); files are written only when `--apply` is specified.
 
 ```bash
 # Show plan for all stages (dry-run)
@@ -41,19 +36,13 @@ pnpm sync -- --apply
 pnpm sync -- --config ./config.json --apply
 ```
 
-Before writing or deleting, existing files are backed up to
-`~/.sync-claude-backup/<timestamp>/<stage.name>/<relPath>` (default; override with `--backup-root`).
-All stages in a single run share one `<timestamp>`, and each stage has its own subdirectory.
-An existing backup is never overwritten: if the backup destination already exists,
-the run aborts with `Backup destination already exists` before the file is modified.
+Before writing or deleting, existing files are backed up to `~/.sync-claude-backup/<timestamp>/<stage.name>/<relPath>` (default; override with `--backup-root`). All stages in a single run share one `<timestamp>`, and each stage has its own subdirectory. An existing backup is never overwritten: if the backup destination already exists, the run aborts with `Backup destination already exists` before the file is modified.
 
 ## config.json
 
-Copy `config.example.json` to `config.json` and edit to match your environment.
-`config.json` is gitignored because it contains machine-specific paths and credentials.
+Copy `config.example.json` to `config.json` and edit to match your environment. `config.json` is gitignored because it contains machine-specific paths.
 
-- `stages[].name`: stage identifier used by `--stage` and as the backup subdirectory.
-  It must match `^[A-Za-z0-9_][A-Za-z0-9._-]*$` and be unique within the config
+- `stages[].name`: stage identifier used by `--stage` and as the backup subdirectory. It must match `^[A-Za-z0-9_][A-Za-z0-9._-]*$` and be unique within the config
 - `stages[].source` / `dest`: source/destination directories (`~` expansion supported)
 - `chezmoiNaming`: whether to convert source names from chezmoi naming to real names
 - `mirror`: whether to delete real-name files inside `managed` that no longer exist in source
@@ -69,5 +58,5 @@ See [`config.schema.json`](./config.schema.json) for the full schema.
 ```bash
 pnpm lint   # prettier + eslint + tsc
 pnpm fix    # prettier + eslint --fix
-pnpm test   # jest
+pnpm test   # jest (with coverage)
 ```

@@ -1,9 +1,9 @@
 /**
- * sync-claude-folder の CLI エントリポイント。
+ * CLI entry point of sync-claude-folder.
  *
  * - `sync [--stage <name>] [--apply] [--config <path>] [--backup-root <path>]`
- *   config.json の各ステージに従い、ソース → dest の同期プランを算出・表示する。
- *   `--apply` を指定した場合のみ実際にファイルを書き込む (既定は dry-run)。
+ *   Computes and prints the source -> dest sync plan for each stage in config.json.
+ *   Files are written only when `--apply` is given (dry-run by default).
  */
 
 import * as os from 'node:os'
@@ -14,14 +14,11 @@ import { loadConfig, selectStages, StageConfig } from './config'
 import { expandHome } from './fsutil'
 import { PlanItem, planStage, StagePlan } from './planner'
 
-// eslint-disable-next-line unicorn/prefer-module -- CommonJS 構成のため __dirname を使用する
+// eslint-disable-next-line unicorn/prefer-module -- CommonJS build, so __dirname is used
 const DEFAULT_CONFIG_PATH = path.join(__dirname, '..', 'config.json')
 const DEFAULT_BACKUP_ROOT = path.join(os.homedir(), '.sync-claude-backup')
 
-/**
- * プラン項目 1 件を 1 行で表示する。
- * @param item プラン項目
- */
+/** Prints one plan item on a single line. */
 function printPlanItem(item: PlanItem): void {
   const marker: Record<PlanItem['action'], string> = {
     create: '+',
@@ -32,10 +29,7 @@ function printPlanItem(item: PlanItem): void {
   console.log(`  [${marker[item.action]}] ${item.relPath} (${item.reason})`)
 }
 
-/**
- * 1 ステージ分のプランを表示する。
- * @param plan ステージプラン
- */
+/** Prints the plan of one stage. */
 function printStagePlan(plan: StagePlan): void {
   console.log(`Stage: ${plan.stage.name}`)
   console.log(`  source: ${plan.stage.source}`)
@@ -61,11 +55,11 @@ function printStagePlan(plan: StagePlan): void {
 }
 
 /**
- * `sync` サブコマンドを実行する。
- * @param configPath config.json への絶対パス
- * @param stageName 対象ステージ名 (未指定の場合は全ステージ)
- * @param apply true の場合のみ実際にファイルを書き込む
- * @param backupRoot バックアップ先ルートディレクトリ
+ * Runs the `sync` subcommand.
+ * @param configPath Absolute path to config.json
+ * @param stageName Target stage name (all stages when omitted)
+ * @param apply Writes files only when true
+ * @param backupRoot Root directory for backups
  */
 export async function runSync(
   configPath: string,
@@ -77,9 +71,7 @@ export async function runSync(
   const stages: StageConfig[] = selectStages(config, stageName)
 
   console.log(
-    apply
-      ? 'Mode: apply (ファイルを書き込みます)'
-      : 'Mode: dry-run (計画のみ表示します)'
+    apply ? 'Mode: apply (files will be written)' : 'Mode: dry-run (plan only)'
   )
   console.log('')
 
@@ -102,7 +94,7 @@ export async function runSync(
   }
 }
 
-/** CLI の使い方を表示する */
+/** Prints CLI usage. */
 function printUsage(): void {
   console.log('Usage:')
   console.log(
@@ -111,22 +103,18 @@ function printUsage(): void {
 }
 
 /**
- * `parseArgs` に渡す前に、pnpm が転送した先頭の孤立した `--` トークンを取り除く。
+ * Removes the stray leading `--` token forwarded by pnpm before the args reach `parseArgs`.
  *
- * `pnpm run sync -- --apply` のように pnpm 経由で実行すると、pnpm の
- * 「`--` 以降を子スクリプトへそのまま転送する」仕様により `--` 自体も
- * `process.argv` に literal な要素として残る。`util.parseArgs` は
- * 裸の `--` を「オプション解析の終端」として扱い、以降の全ての引数を
- * positionals に落としてしまうため、そのまま渡すと `--apply` がオプ
- * ションとして認識されず常に dry-run になってしまう。
+ * When run through pnpm, as in `pnpm run sync -- --apply`, the `--` itself stays in
+ * `process.argv` as a literal element. `util.parseArgs` treats a bare `--` as the end of
+ * option parsing and turns every following argument into positionals, so `--apply` would
+ * not be recognized as an option and the run would always be a dry-run.
  *
- * ここで取り除くのは配列中で最初に見つかった `--` の 1 個のみに限定する。
- * これにより、オプション値として文字通り `"--"` を渡したいケース
- * (例: `--config --`) や、利用者が意図的に 2 個目の `--` を「これ以降は
- * すべて positional として扱う」終端記号として使うケースの標準的な
- * `parseArgs` の挙動を壊さない。
- * @param args 生の CLI 引数配列
- * @returns pnpm 由来の先頭の `--` のみを除いた引数配列
+ * Only the first `--` in the array is removed. This keeps the standard `parseArgs` behavior
+ * for a literal `"--"` passed as an option value (e.g. `--config --`) and for a second `--`
+ * that the user intentionally uses as the "treat everything after this as positional" marker.
+ * @param args Raw CLI argument array
+ * @returns The arguments without the first `--`
  */
 export function stripDoubleDashSeparator(args: string[]): string[] {
   const index = args.indexOf('--')
@@ -135,7 +123,7 @@ export function stripDoubleDashSeparator(args: string[]): string[] {
     : [...args.slice(0, index), ...args.slice(index + 1)]
 }
 
-/** CLI のエントリポイント */
+/** CLI entry point. */
 async function main(): Promise<void> {
   const { positionals, values } = parseArgs({
     args: stripDoubleDashSeparator(process.argv.slice(2)),
@@ -169,7 +157,7 @@ async function main(): Promise<void> {
   }
 }
 
-// eslint-disable-next-line unicorn/prefer-module -- CommonJS 構成のため require.main で判定する
+// eslint-disable-next-line unicorn/prefer-module -- CommonJS build, so require.main is used
 if (require.main === module) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error))
