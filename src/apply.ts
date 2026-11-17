@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs/promises'
 import path from 'node:path'
+import { validateDestinationPath } from './fsutil'
 import { PlanItem, StagePlan } from './planner'
 
 /** Zero-pads a number to 2 digits. */
@@ -209,6 +210,15 @@ export async function applyStagePlan(
   const resolvedOptions: ApplyOptions = { ...options, timestamp }
 
   for (const item of plan.items) {
+    if (item.action !== 'skip') {
+      const destPath = await validateDestinationPath(
+        plan.stage.dest,
+        item.relPath
+      )
+      if (item.destPath !== destPath) {
+        throw new Error(`Destination path does not match root: ${item.relPath}`)
+      }
+    }
     switch (item.action) {
       case 'create': {
         result.created++

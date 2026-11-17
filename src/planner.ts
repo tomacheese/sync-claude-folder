@@ -6,7 +6,13 @@ import * as fs from 'node:fs/promises'
 import path from 'node:path'
 import { ChezmoiAttributes, resolveChezmoiPath } from './chezmoi-name'
 import { StageConfig } from './config'
-import { expandHome, matchAnyGlob, walkFiles } from './fsutil'
+import {
+  expandHome,
+  matchAnyGlob,
+  resolveDestinationPath,
+  validateDestinationPath,
+  walkFiles,
+} from './fsutil'
 import { applyJsonTransform } from './transforms'
 
 /** Action kind in a plan. */
@@ -94,6 +100,8 @@ async function buildExpectedEntries(
         type = 'symlink'
       }
     }
+
+    resolveDestinationPath(stage.dest, targetRel)
 
     // managed is matched against the converted real name
     if (!matchAnyGlob(stage.managed, targetRel)) {
@@ -214,7 +222,7 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
       continue
     }
 
-    const destPath = path.join(destDir, ...targetRel.split('/'))
+    const destPath = await validateDestinationPath(destDir, targetRel)
     const { action, reason } = await decideAction(
       destPath,
       entry,
@@ -255,7 +263,7 @@ export async function planStage(stage: StageConfig): Promise<StagePlan> {
         relPath,
         action: 'delete',
         type: 'file',
-        destPath: path.join(destDir, ...relPath.split('/')),
+        destPath: await validateDestinationPath(destDir, relPath),
         reason: 'managed file not present in source (mirror delete)',
       })
     }

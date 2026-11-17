@@ -38,6 +38,8 @@ pnpm sync -- --config ./config.json --apply
 
 Before writing or deleting, existing files are backed up to `~/.sync-claude-backup/<timestamp>/<stage.name>/<relPath>` (default; override with `--backup-root`). All stages in a single run share one `<timestamp>`, and each stage has its own subdirectory. An existing backup is never overwritten: if the backup destination already exists, the run aborts with `Backup destination already exists` before the file is modified.
 
+Destination paths must be canonical relative paths: empty, `.` and `..` components, absolute paths, and backslash separators are rejected before glob matching. Parent directories below the destination root must not be symlinks, even when they point inside the root. These checks run during planning and again before each change is applied. The configured destination root itself may be a symlink, and leaf symlinks can still be backed up, replaced, or deleted without following their targets. Checks do not provide atomic protection against concurrent filesystem changes.
+
 ## config.json
 
 Copy `config.example.json` to `config.json` and edit to match your environment. `config.json` is gitignored because it contains machine-specific paths.

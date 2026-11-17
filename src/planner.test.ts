@@ -155,6 +155,48 @@ describe('planStage', () => {
     ).toEqual([{ relPath: 'skills', action: 'update' }])
   })
 
+  test.each([
+    'skills/literal_../literal_../escaped.txt',
+    'skills/literal_../escaped.txt',
+    'skills/literal_./entry.txt',
+    'skills/literal_/entry.txt',
+    'skills/literal_..',
+  ])(
+    'rejects unsafe mapped path %s before glob matching',
+    async (sourcePath) => {
+      await writeFile(path.join(sourceDir, sourcePath), 'new')
+      await writeFile(path.join(tmpDir, 'escaped.txt'), 'outside-old')
+      await writeFile(path.join(destDir, 'escaped.txt'), 'protected-old')
+
+      await expect(
+        planStage(
+          buildStage({ managed: ['skills/**'], protected: ['escaped.txt'] })
+        )
+      ).rejects.toThrow('Invalid destination relative path')
+
+      expect(await fs.readFile(path.join(tmpDir, 'escaped.txt'), 'utf8')).toBe(
+        'outside-old'
+      )
+      expect(await fs.readFile(path.join(destDir, 'escaped.txt'), 'utf8')).toBe(
+        'protected-old'
+      )
+    }
+  )
+
+  test('rejects a destination parent symlink before comparing outside files', async () => {
+    const outside = path.join(tmpDir, 'dest-outside')
+    await writeFile(path.join(sourceDir, 'skills/entry.txt'), 'new')
+    await writeFile(path.join(outside, 'entry.txt'), 'outside-old')
+    await fs.symlink(outside, path.join(destDir, 'skills'))
+
+    await expect(
+      planStage(buildStage({ managed: ['skills/**'] }))
+    ).rejects.toThrow('Destination parent is a symlink')
+    expect(await fs.readFile(path.join(outside, 'entry.txt'), 'utf8')).toBe(
+      'outside-old'
+    )
+  })
+
   test('a new file is planned as create', async () => {
     await writeFile(
       path.join(sourceDir, 'hooks', 'executable_foo.sh'),

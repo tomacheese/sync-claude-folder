@@ -35,7 +35,10 @@
           "type": "string",
           "description": "Source directory, which must exist and be readable. Missing source entries abort planning."
         },
-        "dest": { "type": "string" },
+        "dest": {
+          "type": "string",
+          "description": "Destination root (may itself be a symlink). Target paths must be canonical relative paths, and parent directories below this root must not be symlinks."
+        },
         "chezmoiNaming": { "type": "boolean" },
         "mirror": { "type": "boolean" },
         "managed": { "type": "array", "items": { "type": "string" } },

@@ -3,7 +3,7 @@ import * as os from 'node:os'
 import path from 'node:path'
 import { applyStagePlan } from './apply'
 import { StageConfig } from './config'
-import { PlanItem, StagePlan } from './planner'
+import { PlanItem, planStage, StagePlan } from './planner'
 
 const TIMESTAMP = '20260101T000000'
 
@@ -88,6 +88,134 @@ describe('applyStagePlan backups', () => {
     backupRoot,
     timestamp: TIMESTAMP,
   })
+
+  test.each(['create', 'update', 'delete'] as const)(
+    'rejects a parent symlink inserted after planning a %s',
+    async (action) => {
+      const stage = buildPlan('stage-a', []).stage
+      stage.mirror = true
+      await fs.mkdir(stage.source)
+      if (action !== 'delete') {
+        await fs.mkdir(path.join(stage.source, 'skills'))
+        await fs.writeFile(path.join(stage.source, 'skills/entry.txt'), 'new')
+      }
+      if (action !== 'create') {
+        await writeDest('stage-a', 'skills/entry.txt', 'old')
+      }
+      const plan = await planStage(stage)
+      expect(plan.items.map((item) => item.action)).toEqual([action])
+
+      const outside = path.join(tmpDir, 'outside')
+      await fs.mkdir(outside)
+      await fs.writeFile(path.join(outside, 'entry.txt'), 'outside-old')
+      await fs.rm(path.join(stage.dest, 'skills'), {
+        recursive: true,
+        force: true,
+      })
+      await fs.mkdir(stage.dest, { recursive: true })
+      await fs.symlink(outside, path.join(stage.dest, 'skills'))
+
+      await expect(applyStagePlan(plan, options())).rejects.toThrow(
+        'Destination parent is a symlink'
+      )
+      expect(await fs.readFile(path.join(outside, 'entry.txt'), 'utf8')).toBe(
+        'outside-old'
+      )
+      await expect(fs.lstat(backupRoot)).rejects.toMatchObject({
+        code: 'ENOENT',
+      })
+    }
+  )
+
+  test('rechecks parents after an earlier plan item creates a symlink', async () => {
+    const outside = path.join(tmpDir, 'outside')
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, 'entry.txt'), 'outside-old')
+    const link: PlanItem = {
+      ...updateItem('stage-a', 'skills', ''),
+      action: 'create',
+      type: 'symlink',
+      symlinkTarget: outside,
+    }
+    const child = updateItem('stage-a', 'skills/entry.txt', 'new')
+
+    await expect(
+      applyStagePlan(buildPlan('stage-a', [link, child]), options())
+    ).rejects.toThrow('Destination parent is a symlink')
+    expect(await fs.readFile(path.join(outside, 'entry.txt'), 'utf8')).toBe(
+      'outside-old'
+    )
+    await expect(fs.lstat(backupRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('rejects a traversal plan before writing destinations or backups', async () => {
+    await fs.writeFile(path.join(tmpDir, 'escaped.txt'), 'outside-old')
+    const item = updateItem('stage-a', 'skills/../../escaped.txt', 'new')
+    await expect(
+      applyStagePlan(buildPlan('stage-a', [item]), options())
+    ).rejects.toThrow('Invalid destination relative path')
+    expect(await fs.readFile(path.join(tmpDir, 'escaped.txt'), 'utf8')).toBe(
+      'outside-old'
+    )
+    await expect(fs.lstat(backupRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('rejects a plan with an absolute destination outside its root', async () => {
+    const outside = path.join(tmpDir, 'outside.txt')
+    await fs.writeFile(outside, 'outside-old')
+    const item = {
+      ...updateItem('stage-a', 'entry.txt', 'new'),
+      destPath: outside,
+    }
+    await expect(
+      applyStagePlan(buildPlan('stage-a', [item]), options())
+    ).rejects.toThrow('Destination path does not match root')
+    expect(await fs.readFile(outside, 'utf8')).toBe('outside-old')
+    await expect(fs.lstat(backupRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test('a rejected parent symlink remains read-only in dry-run', async () => {
+    const outside = path.join(tmpDir, 'outside')
+    await fs.mkdir(outside)
+    await fs.writeFile(path.join(outside, 'entry.txt'), 'outside-old')
+    await fs.mkdir(path.join(tmpDir, 'stage-a'))
+    await fs.symlink(outside, path.join(tmpDir, 'stage-a/skills'))
+    const item = updateItem('stage-a', 'skills/entry.txt', 'new')
+    await expect(
+      applyStagePlan(buildPlan('stage-a', [item]), {
+        ...options(),
+        apply: false,
+      })
+    ).rejects.toThrow('Destination parent is a symlink')
+    expect(await fs.readFile(path.join(outside, 'entry.txt'), 'utf8')).toBe(
+      'outside-old'
+    )
+    await expect(fs.lstat(backupRoot)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  test.each(['update', 'delete'] as const)(
+    '%s backs up a leaf symlink without changing its outside target',
+    async (action) => {
+      const outside = path.join(tmpDir, 'outside.txt')
+      await fs.writeFile(outside, 'outside-old')
+      await fs.mkdir(path.join(tmpDir, 'stage-a'))
+      const leaf = path.join(tmpDir, 'stage-a/leaf')
+      await fs.symlink(outside, leaf)
+      const item = { ...updateItem('stage-a', 'leaf', 'new'), action }
+
+      await applyStagePlan(buildPlan('stage-a', [item]), options())
+
+      expect(await fs.readFile(outside, 'utf8')).toBe('outside-old')
+      expect(
+        await fs.readlink(path.join(backupRoot, TIMESTAMP, 'stage-a/leaf'))
+      ).toBe(outside)
+      if (action === 'update') {
+        expect(await fs.readFile(leaf, 'utf8')).toBe('new')
+      } else {
+        await expect(fs.lstat(leaf)).rejects.toMatchObject({ code: 'ENOENT' })
+      }
+    }
+  )
 
   test('backups are separated per stage when multiple stages update the same relPath', async () => {
     await writeDest('stage-a', 'settings.json', 'old-a')

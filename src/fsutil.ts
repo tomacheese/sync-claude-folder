@@ -22,6 +22,67 @@ export function toPosixPath(targetPath: string): string {
   return targetPath.split(path.sep).join('/')
 }
 
+/** Resolves a canonical relative path strictly below the destination root. */
+export function resolveDestinationPath(root: string, relPath: string): string {
+  const segments = relPath.split('/')
+  if (
+    relPath.includes('\\') ||
+    relPath.includes('\0') ||
+    segments.some(
+      (segment) =>
+        ['', '.', '..'].includes(segment) ||
+        path.win32.parse(segment).root !== ''
+    )
+  ) {
+    throw new Error(`Invalid destination relative path: ${relPath}`)
+  }
+
+  const destRoot = path.resolve(expandHome(root))
+  const destPath = path.resolve(destRoot, ...segments)
+  const relative = path.relative(destRoot, destPath)
+  if (
+    relative === '' ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(`Destination path escapes root: ${relPath}`)
+  }
+  return destPath
+}
+
+/**
+ * Rejects symlink parents below the configured root, without following the leaf.
+ * Call again before applying a plan because parents may have changed since planning.
+ */
+export async function validateDestinationPath(
+  root: string,
+  relPath: string
+): Promise<string> {
+  const destPath = resolveDestinationPath(root, relPath)
+  let parent = path.resolve(expandHome(root))
+  const parentSegments = relPath.split('/').slice(0, -1)
+  for (const segment of parentSegments) {
+    parent = path.join(parent, segment)
+    const stat = await fs.lstat(parent).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null
+      }
+      throw error
+    })
+    if (!stat) {
+      break
+    }
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Destination parent is a symlink: ${parent}`)
+    }
+    if (!stat.isDirectory()) {
+      throw new Error(`Destination parent is not a directory: ${parent}`)
+    }
+  }
+  return destPath
+}
+
 /**
  * Recursively walks a directory and returns the relative paths (POSIX separators)
  * of files and symlinks, optionally including directories.
